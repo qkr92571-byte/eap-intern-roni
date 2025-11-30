@@ -1,0 +1,23 @@
+"""
+상수 정의
+"""
+
+# 공고 상태
+STATUS_PENDING = 'pending'
+STATUS_APPROVED = 'approved'
+STATUS_REJECTED = 'rejected'
+
+STATUS_CHOICES = [STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED]
+
+# 데이터 소스
+SOURCE_G2B = '나라장터'
+
+# 기본값
+DEFAULT_LIMIT = 100
+MAX_LIMIT = 1000
+
+# 예산 범위 (원 단위)
+MIN_BUDGET = 1000000  # 100만원
+MAX_BUDGET = 100000000000  # 1000억원
+
+

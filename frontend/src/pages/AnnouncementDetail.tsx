@@ -1,0 +1,188 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Paper,
+  Button,
+  Divider,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { getAnnouncementById } from '../services/api';
+import { Announcement, AnnouncementStatus } from '../types';
+import { formatBudget, formatDateShort } from '../utils/formatters';
+import { STATUS_LABELS, STATUS_COLORS } from '../utils/constants';
+import StatusChip from '../components/StatusChip';
+import LoadingSpinner from '../components/LoadingSpinner';
+
+const AnnouncementDetail: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      loadAnnouncement(id);
+    }
+  }, [id]);
+
+  const loadAnnouncement = async (announcementId: string) => {
+    try {
+      setLoading(true);
+      const response = await getAnnouncementById(announcementId);
+      if (response.success && response.data) {
+        setAnnouncement(response.data);
+      }
+    } catch (error) {
+      console.error('공고 상세 정보 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!announcement) {
+    return (
+      <Box>
+        <Typography variant="h6">공고를 찾을 수 없습니다.</Typography>
+        <Button onClick={() => navigate('/announcements')}>목록으로</Button>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/announcements')}
+        sx={{ mb: 2 }}
+      >
+        목록으로
+      </Button>
+
+      <Paper sx={{ p: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h4" component="h1">
+            {announcement.title || '제목 없음'}
+          </Typography>
+          <StatusChip status={announcement.status as AnnouncementStatus} size="medium" />
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            공고번호
+          </Typography>
+          <Typography variant="body1">{announcement.announcement_number || '-'}</Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            기관
+          </Typography>
+          <Typography variant="body1">{announcement.agency || '-'}</Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            사업구분
+          </Typography>
+          <Typography variant="body1">{announcement.business_type || '-'}</Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            공고상태
+          </Typography>
+          <Typography variant="body1">{announcement.announcement_status || '-'}</Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            예산금액
+          </Typography>
+          <Typography variant="body1">
+            {formatBudget(announcement.budget_amount)}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            추정가격
+          </Typography>
+          <Typography variant="body1">
+            {formatBudget(announcement.estimated_price)}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            마감일
+          </Typography>
+          <Typography variant="body1">{announcement.deadline || '-'}</Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            카테고리
+          </Typography>
+          <Typography variant="body1">{announcement.category || '-'}</Typography>
+        </Box>
+
+        {announcement.url && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="textSecondary">
+              원본 링크
+            </Typography>
+            <Typography variant="body1">
+              <a href={announcement.url} target="_blank" rel="noopener noreferrer">
+                {announcement.url}
+              </a>
+            </Typography>
+          </Box>
+        )}
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+            내용
+          </Typography>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+            {announcement.content || '내용 없음'}
+          </Typography>
+        </Box>
+
+        {announcement.review_result && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Box>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                검수 결과
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {announcement.review_result}
+                </Typography>
+              </Paper>
+            </Box>
+          </>
+        )}
+
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="caption" color="textSecondary">
+            수집일: {new Date(announcement.created_at).toLocaleString('ko-KR')}
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
+  );
+};
+
+export default AnnouncementDetail;
+
