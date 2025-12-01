@@ -30,7 +30,7 @@ def test_scraper():
     
     # 히스토리 확인
     print("2. 히스토리 확인:")
-    request_date = datetime(2025, 11, 30)  # 오늘 날짜
+    request_date = datetime.now()  # 오늘 날짜
     history_numbers = get_history_numbers(request_date)
     print(f"   요청일: {request_date.strftime('%Y-%m-%d')}")
     print(f"   히스토리 공고번호 개수: {len(history_numbers)}개")

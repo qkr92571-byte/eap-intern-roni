@@ -15,9 +15,9 @@ DEFAULT_KEYWORDS = [
 
 def get_keywords() -> List[str]:
     """저장된 키워드 목록 조회"""
-    db = get_db()
-    
     try:
+        db = get_db()
+        
         # keywords 컬렉션에서 조회
         keywords_doc = db.collection('settings').document('keywords').get()
         
@@ -29,7 +29,7 @@ def get_keywords() -> List[str]:
             set_keywords(DEFAULT_KEYWORDS)
             return DEFAULT_KEYWORDS
     except Exception as e:
-        print(f"키워드 조회 중 오류: {str(e)}")
+        print(f"⚠️  Firebase 키워드 조회 실패, 기본 키워드 사용: {str(e)}")
         return DEFAULT_KEYWORDS
 
 def set_keywords(keywords: List[str]) -> bool:

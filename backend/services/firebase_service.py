@@ -18,9 +18,12 @@ def init_firebase():
         if os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
+            print(f"✅ Firebase 초기화 성공: {cred_path}")
         else:
-            # 환경 변수에서 직접 인증 정보를 가져오는 경우
-            firebase_admin.initialize_app()
+            # 키 파일이 없으면 오류 메시지 출력
+            print(f"⚠️  Firebase 키 파일을 찾을 수 없습니다: {cred_path}")
+            print(f"   Firebase 기능을 사용하려면 키 파일이 필요합니다.")
+            raise FileNotFoundError(f"Firebase 키 파일을 찾을 수 없습니다: {cred_path}")
     
     _db = firestore.client()
     return _db
