@@ -43,6 +43,7 @@ const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 100 });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터 추가
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [sortBy, setSortBy] = useState<'date' | 'budget'>('date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -57,7 +58,16 @@ const AnnouncementList: React.FC = () => {
       
       const matchesStatus = statusFilter === 'all' || announcement.status === statusFilter;
       
-      return matchesSearch && matchesStatus;
+      // 검수 결과 필터링 (적합/부적합)
+      const matchesReview = (() => {
+        if (reviewFilter === 'all') return true;
+        if (reviewFilter === 'approved') return announcement.status === 'approved';
+        if (reviewFilter === 'rejected') return announcement.status === 'rejected';
+        if (reviewFilter === 'pending') return announcement.status === 'pending' || !announcement.reviewed;
+        return true;
+      })();
+      
+      return matchesSearch && matchesStatus && matchesReview;
     })
     .sort((a, b) => {
       if (sortBy === 'date') {
@@ -76,6 +86,16 @@ const AnnouncementList: React.FC = () => {
       pending: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.PENDING).length,
       approved: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.APPROVED).length,
       rejected: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.REJECTED).length,
+    };
+  }, [announcements]);
+
+  // 검수 결과별 공고 개수 계산
+  const reviewCounts = useMemo(() => {
+    return {
+      all: announcements.length,
+      approved: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.APPROVED).length,
+      rejected: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.REJECTED).length,
+      pending: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.PENDING || !a.reviewed).length,
     };
   }, [announcements]);
 
@@ -163,6 +183,7 @@ const AnnouncementList: React.FC = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>예산금액</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>마감일</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>상태</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>검수결과</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>수집일</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>작업</TableCell>
               </TableRow>
@@ -170,9 +191,9 @@ const AnnouncementList: React.FC = () => {
             <TableBody>
               {filteredAnnouncements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                     <Typography color="textSecondary">
-                      {searchTerm || statusFilter !== 'all' 
+                      {searchTerm || statusFilter !== 'all' || reviewFilter !== 'all'
                         ? '검색 조건에 맞는 공고가 없습니다.' 
                         : '공고가 없습니다.'}
                     </Typography>
@@ -217,6 +238,17 @@ const AnnouncementList: React.FC = () => {
                       <StatusChip status={announcement.status as AnnouncementStatus} />
                     </TableCell>
                     <TableCell>
+                      {announcement.reviewed ? (
+                        <Chip
+                          label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
+                          color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
+                          size="small"
+                        />
+                      ) : (
+                        <Chip label="미검수" color="default" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="caption" color="textSecondary">
                         {formatDateShort(announcement.created_at)}
                       </Typography>
@@ -245,7 +277,7 @@ const AnnouncementList: React.FC = () => {
             <Grid item xs={12}>
               <Paper sx={{ p: 4, textAlign: 'center' }}>
                 <Typography color="textSecondary">
-                  {searchTerm || statusFilter !== 'all' 
+                  {searchTerm || statusFilter !== 'all' || reviewFilter !== 'all'
                     ? '검색 조건에 맞는 공고가 없습니다.' 
                     : '공고가 없습니다.'}
                 </Typography>
@@ -271,7 +303,17 @@ const AnnouncementList: React.FC = () => {
                 >
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Box display="flex" justifyContent="space-between" alignItems="start" mb={1}>
-                      <StatusChip status={announcement.status as AnnouncementStatus} />
+                      <Box display="flex" gap={1} alignItems="center">
+                        <StatusChip status={announcement.status as AnnouncementStatus} />
+                        {announcement.reviewed && (
+                          <Chip
+                            label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
+                            color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
                       <Typography variant="caption" color="textSecondary">
                         {formatDateShort(announcement.created_at)}
                       </Typography>

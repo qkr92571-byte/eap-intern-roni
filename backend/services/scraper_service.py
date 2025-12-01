@@ -88,25 +88,113 @@ def run_scraper(keywords=None, request_date=None):
             # 2. "입찰" 메뉴 클릭
             print("\n[2단계] '입찰' 메뉴 클릭 중...")
             menu_bid_id = 'mf_wfm_gnb_wfm_gnbMenu_wq_uuid_567'
+            
+            # 페이지 상태 확인
+            if page.is_closed():
+                raise Exception("페이지가 메뉴 클릭 전에 닫혔습니다")
+            
+            # 메뉴 요소 존재 확인
+            menu_exists = page.evaluate(f"""
+                () => {{
+                    const el = document.getElementById('{menu_bid_id}');
+                    return el !== null;
+                }}
+            """)
+            
+            if not menu_exists:
+                print("  ⚠️  입찰 메뉴 요소를 찾을 수 없습니다. 페이지 구조가 변경되었을 수 있습니다.")
+                # 현재 URL 확인
+                current_url = page.url
+                print(f"  현재 URL: {current_url}")
+            
             page.evaluate(f"""
                 () => {{
                     const el = document.getElementById('{menu_bid_id}');
-                    if (el) el.click();
+                    if (el) {{
+                        el.click();
+                    }}
                 }}
             """)
+            
+            # 페이지 로딩 대기
+            try:
+                page.wait_for_load_state('networkidle', timeout=10000)
+            except:
+                print("  ⚠️  네트워크 대기 시간 초과 (계속 진행)")
+            
             time.sleep(2)
+            
+            # 페이지 상태 재확인
+            if page.is_closed():
+                raise Exception("페이지가 입찰 메뉴 클릭 후 닫혔습니다")
+            
             print("  ✅ 입찰 메뉴 클릭 완료")
             
             # 3. "입찰공고목록" 서브메뉴 클릭
             print("\n[3단계] '입찰공고목록' 서브메뉴 클릭 중...")
             menu_bid_list_id = 'mf_wfm_gnb_wfm_gnbMenu_genDepth1_1_genDepth2_0_genDepth3_0_btn_menuLvl3'
+            
+            # 페이지 상태 확인
+            if page.is_closed():
+                raise Exception("페이지가 서브메뉴 클릭 전에 닫혔습니다")
+            
+            # 서브메뉴 요소 존재 확인
+            submenu_exists = page.evaluate(f"""
+                () => {{
+                    const el = document.getElementById('{menu_bid_list_id}');
+                    return el !== null;
+                }}
+            """)
+            
+            if not submenu_exists:
+                print("  ⚠️  입찰공고목록 서브메뉴 요소를 찾을 수 없습니다.")
+                print("  ⚠️  페이지 구조가 변경되었거나, 메뉴가 아직 로드되지 않았을 수 있습니다.")
+                # 현재 URL 및 페이지 상태 확인
+                current_url = page.url
+                page_title = page.title()
+                print(f"  현재 URL: {current_url}")
+                print(f"  페이지 제목: {page_title}")
+                print("  ⚠️  추가 대기 후 재시도...")
+                time.sleep(5)
+                
+                # 재확인
+                submenu_exists = page.evaluate(f"""
+                    () => {{
+                        const el = document.getElementById('{menu_bid_list_id}');
+                        return el !== null;
+                    }}
+                """)
+                
+                if not submenu_exists:
+                    raise Exception(f"입찰공고목록 서브메뉴를 찾을 수 없습니다. 메뉴 ID: {menu_bid_list_id}")
+            
             page.evaluate(f"""
                 () => {{
                     const el = document.getElementById('{menu_bid_list_id}');
-                    if (el) el.click();
+                    if (el) {{
+                        el.click();
+                    }}
                 }}
             """)
+            
+            # 페이지 로딩 대기 (중요: 메뉴 클릭 후 페이지 이동 대기)
+            try:
+                page.wait_for_load_state('networkidle', timeout=15000)
+                print("  ✅ 네트워크 로딩 완료")
+            except Exception as e:
+                print(f"  ⚠️  네트워크 대기 시간 초과: {str(e)}")
+                print("  ⚠️  계속 진행하지만 페이지가 완전히 로드되지 않았을 수 있습니다.")
+            
             time.sleep(3)
+            
+            # 페이지 상태 최종 확인
+            if page.is_closed():
+                raise Exception("페이지가 서브메뉴 클릭 후 닫혔습니다")
+            
+            # 현재 URL 확인 (페이지 이동 확인)
+            current_url = page.url
+            print(f"  현재 URL: {current_url}")
+            
             print("  ✅ 입찰공고목록 메뉴 클릭 완료")
             print("  ✅ 입찰공고목록 페이지 이동 완료!")
             
@@ -383,6 +471,8 @@ def parse_publish_date(date_str):
     
     # 날짜 파싱 시도 (여러 형식 지원)
     date_formats = [
+        '%Y/%m/%d %H:%M',  # "2025/11/28 14:37" 형식 추가
+        '%Y/%m/%d',        # "2025/11/28" 형식 추가
         '%Y.%m.%d %H:%M',
         '%Y.%m.%d',
         '%Y-%m-%d %H:%M:%S',
