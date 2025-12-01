@@ -1,16 +1,17 @@
 from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
+import time
+import os
+import re
+from dotenv import load_dotenv
+
 from services.keyword_service import get_keywords
 from services.file_service import (
     save_report,
     save_history,
-    check_duplicate_from_history,
-    load_report
+    get_history_numbers
 )
 from models.announcement_schema import AnnouncementSchema
-import time
-import os
-from dotenv import load_dotenv
 
 # 환경변수 로드
 load_dotenv()
@@ -37,7 +38,6 @@ def run_scraper(keywords=None, request_date=None):
     
     # 히스토리에서 중복 체크용 공고번호 조회 (요청일 -1일까지)
     print("히스토리 파일에서 중복 체크용 공고번호 조회 중...")
-    from services.file_service import get_history_numbers
     history_numbers = get_history_numbers(request_date)
     print(f"  히스토리에서 {len(history_numbers)}개의 공고번호 발견")
     
@@ -193,18 +193,7 @@ def run_scraper(keywords=None, request_date=None):
             print(f"  파일 저장 중 오류: {str(e)}")
             import traceback
             print(traceback.format_exc())
-    else:
-        # 필터링된 결과가 없으면 전체 데이터를 저장 (디버깅용)
-        print("\n[디버깅] 필터링된 결과가 없어 전체 데이터를 저장합니다.")
-        try:
-            report_path = save_report(results, request_date)
-            print(f"  Report 파일 저장 (전체 데이터): {report_path}")
-        except Exception as e:
-            print(f"  파일 저장 중 오류: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-    
-    return filtered_results if filtered_results else results
+    return filtered_results
 
 def search_by_keyword(page, keyword, request_date=None, is_first_keyword=False):
     """키워드로 검색하여 공고 수집"""
@@ -600,30 +589,6 @@ def scrape_announcements_from_page(page, request_date=None):
             row_count = rows.count()
             print(f"  테이블에서 {row_count}개 행 발견")
             
-            # 디버깅: 첫 번째 행의 컬럼 수와 각 컬럼 내용 확인
-            if row_count > 0:
-                first_row = rows.nth(0)
-                first_row_cells = first_row.locator('td')
-                cell_count = first_row_cells.count()
-                print(f"  [디버깅] 첫 번째 행의 컬럼 수: {cell_count}개")
-                print(f"  [디버깅] 처음 5개 컬럼 내용:")
-                for debug_col in range(min(5, cell_count)):
-                    try:
-                        cell_text = first_row_cells.nth(debug_col).inner_text().strip()
-                        print(f"    컬럼 {debug_col+1}: '{cell_text[:30]}'")
-                    except:
-                        pass
-                print(f"  [디버깅] 모든 컬럼의 ID 확인:")
-                for debug_col in range(min(16, cell_count)):
-                    try:
-                        cell = first_row_cells.nth(debug_col)
-                        cell_id = cell.get_attribute('id') or ''
-                        cell_text = cell.inner_text().strip()
-                        if 'column' in cell_id.lower():
-                            print(f"    컬럼 {debug_col+1}: ID='{cell_id}', 텍스트='{cell_text[:30]}'")
-                    except:
-                        pass
-            
             # 날짜 필터링 기준 (7일 전)
             date_threshold = request_date - timedelta(days=7)
             print(f"  날짜 필터링 기준: {date_threshold.strftime('%Y-%m-%d')} 이후 공고만 수집")
@@ -687,7 +652,6 @@ def scrape_announcements_from_page(page, request_date=None):
                     if col_16:
                         # 배정예산 추출
                         if '배정예산' in col_16 or '배정 예산' in col_16:
-                            import re
                             budget_match = re.search(r'배정\s*예산\s*:\s*([0-9,]+원)', col_16)
                             if budget_match:
                                 budget_str = budget_match.group(1)
@@ -695,7 +659,6 @@ def scrape_announcements_from_page(page, request_date=None):
                         
                         # 추정가격 추출
                         if '추정가격' in col_16 or '추정 가격' in col_16:
-                            import re
                             price_match = re.search(r'추정\s*가격\s*:\s*([0-9,]+원)', col_16)
                             if price_match:
                                 price_str = price_match.group(1)
@@ -741,131 +704,3 @@ def scrape_announcements_from_page(page, request_date=None):
     
     return announcements
 
-def extract_text_by_xpath_pattern(row, page, row_index, column_id):
-    """
-    XPath 패턴을 사용하여 특정 컬럼의 텍스트 추출
-    column_id 예: 'column23', 'column21', 'column19'
-    """
-    try:
-        # 방법 1: JavaScript로 직접 XPath 패턴 사용
-        text = page.evaluate(f"""
-            (rowIndex) => {{
-                const table = document.getElementById('mf_wfm_container_tacBidPbancLst_contents_tab2_body_gridView1_body_table');
-                if (table) {{
-                    const rows = table.querySelectorAll('tbody tr');
-                    if (rows[rowIndex]) {{
-                        // columnId에 해당하는 요소 찾기 (예: column23)
-                        const columnId = '{column_id}';
-                        const cellId = `mf_wfm_container_tacBidPbancLst_contents_tab2_body_gridView1_${{columnId}}`;
-                        const cell = rows[rowIndex].querySelector(`[id*="${{columnId}}"]`);
-                        if (cell) {{
-                            return cell.innerText.trim();
-                        }}
-                        // 또는 td 요소들 중에서 찾기
-                        const cells = rows[rowIndex].querySelectorAll('td');
-                        for (let cell of cells) {{
-                            if (cell.id && cell.id.includes(columnId)) {{
-                                return cell.innerText.trim();
-                            }}
-                        }}
-                    }}
-                }}
-                return '';
-            }}
-        """, row_index)
-        
-        if text:
-            return text
-        
-        # 방법 2: 컬럼 인덱스로 시도 (column23이면 23번째 컬럼)
-        # 하지만 실제 테이블은 16개 컬럼만 있으므로 이 방법은 작동하지 않을 수 있음
-        column_num = int(column_id.replace('column', ''))
-        if column_num <= 16:  # 실제 컬럼 수 확인
-            cell = row.locator('td').nth(column_num - 1)  # 0-based index
-            if cell.count() > 0:
-                text = cell.inner_text().strip()
-                if text:
-                    return text
-                
-    except Exception as e:
-        print(f"    {column_id} 추출 실패: {str(e)}")
-    return ''
-
-def extract_text_from_row(row, column_index):
-    """테이블 행에서 특정 컬럼의 텍스트 추출"""
-    try:
-        cell = row.locator('td').nth(column_index - 1)  # 0-based index
-        if cell.count() > 0:
-            text = cell.inner_text().strip()
-            return text
-    except Exception as e:
-        print(f"    컬럼 {column_index} 추출 실패: {str(e)}")
-    return ''
-
-def extract_business_type_from_row(row, page, row_index):
-    """
-    업무구분 컬럼 추출 (XPath 사용)
-    XPath: //*[@id="mf_wfm_container_tacBidPbancLst_contents_tab2_body_gridView1_column27"]
-    """
-    try:
-        # 방법 1: 행 내에서 컬럼 인덱스로 찾기 (27번째 컬럼)
-        cell = row.locator('td').nth(26)  # 0-based index (27-1=26)
-        if cell.count() > 0:
-            text = cell.inner_text().strip()
-            if text:
-                return text
-        
-        # 방법 2: XPath로 직접 찾기 (각 행의 해당 컬럼)
-        # 테이블 내에서 해당 행의 업무구분 컬럼 찾기
-        business_type_element = page.locator(f'xpath=//*[@id="mf_wfm_container_tacBidPbancLst_contents_tab2_body_gridView1_body_table"]/tbody/tr[{row_index + 1}]/td[27]')
-        if business_type_element.count() > 0:
-            text = business_type_element.first.inner_text().strip()
-            if text:
-                return text
-        
-        # 방법 3: JavaScript로 찾기
-        business_type_text = page.evaluate("""
-            (rowIndex) => {
-                const table = document.getElementById('mf_wfm_container_tacBidPbancLst_contents_tab2_body_gridView1_body_table');
-                if (table) {
-                    const rows = table.querySelectorAll('tbody tr');
-                    if (rows[rowIndex]) {
-                        const cells = rows[rowIndex].querySelectorAll('td');
-                        if (cells[26]) { // 27번째 컬럼 (0-based index 26)
-                            return cells[26].innerText.trim();
-                        }
-                    }
-                }
-                return '';
-            }
-        """, row_index)
-        
-        if business_type_text:
-            return business_type_text
-            
-    except Exception as e:
-        print(f"    업무구분 추출 실패 (행 {row_index + 1}): {str(e)}")
-    return ''
-
-def extract_text_from_row_with_xpath(row, page, column_index):
-    """
-    테이블 행에서 특정 컬럼의 텍스트 추출 (XPath 사용)
-    게시일시 컬럼의 경우 /div/div 구조를 고려
-    """
-    try:
-        # 먼저 일반적인 방법으로 시도
-        cell = row.locator('td').nth(column_index - 1)
-        if cell.count() > 0:
-            # 게시일시 컬럼(15)의 경우 div/div 구조 확인
-            if column_index == 15:
-                div_elements = cell.locator('div div')
-                if div_elements.count() > 0:
-                    text = div_elements.first.inner_text().strip()
-                    if text:
-                        return text
-            # 일반적인 경우
-            text = cell.inner_text().strip()
-            return text
-    except Exception as e:
-        print(f"    컬럼 {column_index} 추출 실패: {str(e)}")
-    return ''

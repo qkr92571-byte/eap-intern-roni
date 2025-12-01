@@ -6,8 +6,9 @@ Firebase 연결 테스트 스크립트
 import sys
 import os
 
-# 프로젝트 루트를 Python 경로에 추가
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 프로젝트 루트를 Python 경로에 추가 (backend 디렉토리)
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
 from services.firebase_service import init_firebase, get_db
 from models.announcement_schema import AnnouncementSchema

@@ -16,6 +16,7 @@ export interface Announcement {
   business_type?: string;  // 사업구분
   announcement_status?: string;  // 공고상태 (나라장터 원본 상태)
   deadline?: string;  // 마감일
+  publish_date?: string;  // 게시일 (YYYY/MM/DD 형식)
   url?: string;  // 원본 링크
   content?: string;  // 공고 내용
   category?: string;  // 카테고리

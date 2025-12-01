@@ -12,8 +12,9 @@ import requests
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 
-# 프로젝트 루트를 Python 경로에 추가
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 프로젝트 루트를 Python 경로에 추가 (backend 디렉토리)
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
 from dotenv import load_dotenv
 load_dotenv()

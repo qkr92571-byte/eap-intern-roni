@@ -9,7 +9,12 @@ load_dotenv()
 
 app = Flask(__name__)
 # CORS 설정: 개발 환경에서 모든 origin 허용
-CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"], supports_credentials=True)
+CORS(app, origins=[
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://172.30.1.41:3000",
+    "https://clean-carrots-run.loca.lt"
+], supports_credentials=True)
 
 # Firebase 초기화
 init_firebase()

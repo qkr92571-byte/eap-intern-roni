@@ -107,11 +107,11 @@ def scrape_announcements():
         if not isinstance(keywords, list):
             keywords = []
         
-               print(f"스크래퍼 실행 시작 - 키워드: {keywords}")
-               
-               # 스크래퍼 실행 (로컬 파일 저장)
-               from datetime import datetime
-               results = run_scraper(keywords=keywords, request_date=datetime.now())
+        print(f"스크래퍼 실행 시작 - 키워드: {keywords}")
+        
+        # 스크래퍼 실행 (로컬 파일 저장)
+        from datetime import datetime
+        results = run_scraper(keywords=keywords, request_date=datetime.now())
         
         keyword_info = f' (키워드: {", ".join(keywords)})' if keywords else ' (전체 공고)'
         

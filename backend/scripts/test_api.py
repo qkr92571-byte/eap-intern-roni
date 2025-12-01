@@ -9,7 +9,7 @@ import requests
 import json
 import sys
 
-API_BASE_URL = "http://localhost:5000/api"
+API_BASE_URL = "http://localhost:5001/api"
 
 def test_api_endpoints():
     """API 엔드포인트 테스트"""
@@ -20,7 +20,7 @@ def test_api_endpoints():
     # 1. Health check
     print("\n1. Health check 테스트...")
     try:
-        response = requests.get("http://localhost:5000/")
+        response = requests.get("http://localhost:5001/")
         if response.status_code == 200:
             print(f"   ✅ Health check 성공: {response.json()}")
         else:
