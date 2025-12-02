@@ -19,6 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { label: '공고 목록', path: '/' },
+    { label: '경쟁사 동향', path: '/competitors' },
   ];
 
   return (
