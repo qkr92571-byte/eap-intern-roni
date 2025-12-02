@@ -8,7 +8,6 @@ import {
   Box,
   Button,
 } from '@mui/material';
-import BusinessIcon from '@mui/icons-material/Business';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,9 +27,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="static">
         <Toolbar>
-          <BusinessIcon sx={{ mr: 2 }} />
+          <Box
+            component="img"
+            src="/logo.png"
+            alt="인턴 로니"
+            sx={{
+              height: 40,
+              width: 'auto',
+              mr: 2,
+              objectFit: 'contain',
+            }}
+          />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            나라장터 공고 관리 시스템
+            인턴 로니
           </Typography>
           {menuItems.map((item) => (
             <Button
