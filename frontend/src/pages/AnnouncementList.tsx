@@ -17,13 +17,13 @@ import {
   Card,
   CardContent,
   Grid,
-  Tabs,
-  Tab,
   Button,
   Menu,
   MenuItem,
   Stack,
   Divider,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Search,
@@ -34,7 +34,6 @@ import {
 } from '@mui/icons-material';
 import { useAnnouncements } from '../hooks/useAnnouncements';
 import { Announcement, AnnouncementStatus } from '../types';
-import { STATUS_LABELS, STATUS_COLORS, ANNOUNCEMENT_STATUS } from '../utils/constants';
 import { formatBudget, formatDateShort } from '../utils/formatters';
 import StatusChip from '../components/StatusChip';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -42,10 +41,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 100 });
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터 추가
+  const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
-  const [sortBy, setSortBy] = useState<'date' | 'budget'>('date');
+  const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
 
@@ -56,8 +54,6 @@ const AnnouncementList: React.FC = () => {
         announcement.agency.toLowerCase().includes(searchTerm.toLowerCase()) ||
         announcement.announcement_number?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || announcement.status === statusFilter;
-      
       // 검수 결과 필터링 (적합/부적합)
       const matchesReview = (() => {
         if (reviewFilter === 'all') return true;
@@ -67,10 +63,14 @@ const AnnouncementList: React.FC = () => {
         return true;
       })();
       
-      return matchesSearch && matchesStatus && matchesReview;
+      return matchesSearch && matchesReview;
     })
     .sort((a, b) => {
-      if (sortBy === 'date') {
+      if (sortBy === 'publish_date') {
+        const dateA = a.publish_date ? new Date(a.publish_date).getTime() : 0;
+        const dateB = b.publish_date ? new Date(b.publish_date).getTime() : 0;
+        return dateB - dateA; // 최신순
+      } else if (sortBy === 'created_at') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } else {
         const budgetA = a.budget_amount || 0;
@@ -79,23 +79,13 @@ const AnnouncementList: React.FC = () => {
       }
     });
 
-  // 상태별 공고 개수 계산
-  const statusCounts = useMemo(() => {
-    return {
-      all: announcements.length,
-      pending: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.PENDING).length,
-      approved: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.APPROVED).length,
-      rejected: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.REJECTED).length,
-    };
-  }, [announcements]);
-
   // 검수 결과별 공고 개수 계산
   const reviewCounts = useMemo(() => {
     return {
       all: announcements.length,
-      approved: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.APPROVED).length,
-      rejected: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.REJECTED).length,
-      pending: announcements.filter(a => a.status === ANNOUNCEMENT_STATUS.PENDING || !a.reviewed).length,
+      approved: announcements.filter(a => a.status === 'approved').length,
+      rejected: announcements.filter(a => a.status === 'rejected').length,
+      pending: announcements.filter(a => a.status === 'pending' || !a.reviewed).length,
     };
   }, [announcements]);
 
@@ -142,7 +132,10 @@ const AnnouncementList: React.FC = () => {
             정렬
           </Button>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleSortMenuClose}>
-            <MenuItem onClick={() => { setSortBy('date'); handleSortMenuClose(); }}>
+            <MenuItem onClick={() => { setSortBy('publish_date'); handleSortMenuClose(); }}>
+              게시일순
+            </MenuItem>
+            <MenuItem onClick={() => { setSortBy('created_at'); handleSortMenuClose(); }}>
               수집일순
             </MenuItem>
             <MenuItem onClick={() => { setSortBy('budget'); handleSortMenuClose(); }}>
@@ -158,16 +151,16 @@ const AnnouncementList: React.FC = () => {
         </Box>
       </Box>
 
-      {/* 상태 필터 탭 */}
+      {/* 검수결과 필터 탭 */}
       <Tabs
-        value={statusFilter}
-        onChange={(e, newValue) => setStatusFilter(newValue)}
+        value={reviewFilter}
+        onChange={(e, newValue) => setReviewFilter(newValue)}
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tab label={`전체 (${statusCounts.all})`} value="all" />
-        <Tab label={`대기 중 (${statusCounts.pending})`} value="pending" />
-        <Tab label={`승인됨 (${statusCounts.approved})`} value="approved" />
-        <Tab label={`거부됨 (${statusCounts.rejected})`} value="rejected" />
+        <Tab label={`전체 (${reviewCounts.all})`} value="all" />
+        <Tab label={`적합 (${reviewCounts.approved})`} value="approved" />
+        <Tab label={`부적합 (${reviewCounts.rejected})`} value="rejected" />
+        <Tab label={`미검수 (${reviewCounts.pending})`} value="pending" />
       </Tabs>
 
       {/* 테이블 뷰 */}
@@ -181,19 +174,18 @@ const AnnouncementList: React.FC = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>기관</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>사업구분</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>예산금액</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>게시일</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>마감일</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>상태</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>검수결과</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>수집일</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>작업</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredAnnouncements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                     <Typography color="textSecondary">
-                      {searchTerm || statusFilter !== 'all' || reviewFilter !== 'all'
+                      {searchTerm || reviewFilter !== 'all'
                         ? '검색 조건에 맞는 공고가 없습니다.' 
                         : '공고가 없습니다.'}
                     </Typography>
@@ -233,10 +225,12 @@ const AnnouncementList: React.FC = () => {
                         {formatBudget(announcement.budget_amount)}
                       </Typography>
                     </TableCell>
-                    <TableCell>{announcement.deadline || '-'}</TableCell>
                     <TableCell>
-                      <StatusChip status={announcement.status as AnnouncementStatus} />
+                      <Typography variant="body2">
+                        {announcement.publish_date || '-'}
+                      </Typography>
                     </TableCell>
+                    <TableCell>{announcement.deadline || '-'}</TableCell>
                     <TableCell>
                       {announcement.reviewed ? (
                         <Chip
@@ -253,15 +247,6 @@ const AnnouncementList: React.FC = () => {
                         {formatDateShort(announcement.created_at)}
                       </Typography>
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <IconButton
-                        size="small"
-                        onClick={() => navigate(`/announcements/${announcement.id}`)}
-                        color="primary"
-                      >
-                        <Visibility />
-                      </IconButton>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -277,7 +262,7 @@ const AnnouncementList: React.FC = () => {
             <Grid item xs={12}>
               <Paper sx={{ p: 4, textAlign: 'center' }}>
                 <Typography color="textSecondary">
-                  {searchTerm || statusFilter !== 'all' || reviewFilter !== 'all'
+                  {searchTerm || reviewFilter !== 'all'
                     ? '검색 조건에 맞는 공고가 없습니다.' 
                     : '공고가 없습니다.'}
                 </Typography>

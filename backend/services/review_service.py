@@ -280,8 +280,15 @@ def review_announcement_with_chatgpt(announcement: Dict) -> Dict:
         
         result_text = response.choices[0].message.content
         
-        # 응답 파싱
-        approved = '적합' in result_text or '적합합니다' in result_text or '적합하다' in result_text
+        # 응답 파싱 (부적합을 먼저 체크)
+        result_lower = result_text.lower()
+        if '부적합' in result_text or '부적합합니다' in result_text or '부적합하다' in result_text:
+            approved = False
+        elif '적합' in result_text and '부적합' not in result_text:
+            approved = True
+        else:
+            # 기본값: 적합 여부가 명확하지 않으면 부적합으로 처리
+            approved = False
         
         return {
             'approved': approved,

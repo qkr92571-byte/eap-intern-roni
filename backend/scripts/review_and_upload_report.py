@@ -39,7 +39,7 @@ def review_and_upload_report(report_date=None):
         # 1단계: 리포트 파일 검수
         print("[1단계] 리포트 파일 검수")
         print("-" * 60)
-        review_result = review_report_file(report_date)
+        review_result = review_report_file(report_date, confirm_before_review=False)
         
         if not review_result.get('success', False):
             print(f"\n❌ 검수 실패: {review_result.get('error', '알 수 없는 오류')}")

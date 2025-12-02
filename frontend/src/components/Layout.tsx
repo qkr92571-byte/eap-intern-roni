@@ -18,9 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   const menuItems = [
-    { label: '대시보드', path: '/' },
-    { label: '공고 목록', path: '/announcements' },
-    { label: '공고 수집', path: '/scrape' },
+    { label: '공고 목록', path: '/' },
   ];
 
   return (

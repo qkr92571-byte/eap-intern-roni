@@ -5,8 +5,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
 import AnnouncementList from './pages/AnnouncementList';
 import AnnouncementDetail from './pages/AnnouncementDetail';
-import ScrapePage from './pages/ScrapePage';
-import Dashboard from './pages/Dashboard';
 
 const theme = createTheme({
   palette: {
@@ -27,10 +25,9 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<AnnouncementList />} />
             <Route path="/announcements" element={<AnnouncementList />} />
             <Route path="/announcements/:id" element={<AnnouncementDetail />} />
-            <Route path="/scrape" element={<ScrapePage />} />
           </Routes>
         </Layout>
       </Router>
