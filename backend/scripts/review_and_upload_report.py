@@ -17,7 +17,8 @@ sys.path.insert(0, backend_dir)
 
 from services.review_service import review_report_file
 from services.firebase_service import init_firebase, save_announcement, check_duplicate_announcement
-from services.file_service import load_report
+from services.file_service import load_report, REPORT_DIR, get_date_string
+from services.slack_service import send_report_to_slack
 
 def review_and_upload_report(report_date=None):
     """
@@ -140,6 +141,20 @@ def review_and_upload_report(report_date=None):
                 print(f"   [{idx}/{len(report_data)}] ❌ 업로드 실패: {str(e)}")
                 failed_count += 1
                 continue
+        
+        # 4단계: 슬랙 메시지 전송
+        print("\n[4단계] 슬랙 메시지 전송")
+        print("-" * 60)
+        
+        report_file = REPORT_DIR / f'report_{get_date_string(report_date)}.json'
+        if report_file.exists():
+            slack_success = send_report_to_slack(str(report_file))
+            if slack_success:
+                print("✅ 슬랙 메시지 전송 완료")
+            else:
+                print("⚠️  슬랙 메시지 전송 실패 (환경변수 확인 필요)")
+        else:
+            print("⚠️  리포트 파일을 찾을 수 없어 슬랙 전송을 건너뜁니다.")
         
         # 최종 결과 출력
         print("\n" + "=" * 60)
