@@ -8,9 +8,10 @@ import {
   Divider,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { getAnnouncementById } from '../services/api';
 import { Announcement, AnnouncementStatus } from '../types';
-import { formatBudget, formatDateShort } from '../utils/formatters';
+import { formatBudget, formatDateShort, getNaraJangteoUrl } from '../utils/formatters';
 import { STATUS_LABELS, STATUS_COLORS } from '../utils/constants';
 import StatusChip from '../components/StatusChip';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -69,7 +70,25 @@ const AnnouncementDetail: React.FC = () => {
           <Typography variant="h4" component="h1">
             {announcement.title || '제목 없음'}
           </Typography>
-          <StatusChip status={announcement.status as AnnouncementStatus} size="medium" />
+          <Box display="flex" gap={2} alignItems="center">
+            <StatusChip status={announcement.status as AnnouncementStatus} size="medium" />
+            {(() => {
+              const naraUrl = getNaraJangteoUrl(announcement.announcement_number);
+              return naraUrl ? (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<OpenInNewIcon />}
+                  href={naraUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  component="a"
+                >
+                  나라장터에서 보기
+                </Button>
+              ) : null;
+            })()}
+          </Box>
         </Box>
 
         <Divider sx={{ my: 2 }} />

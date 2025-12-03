@@ -55,4 +55,20 @@ export const formatNumber = (num?: number): string => {
   return num.toLocaleString('ko-KR');
 };
 
+/**
+ * 공고번호를 기반으로 나라장터 상세 페이지 URL 생성
+ * @param announcementNumber 공고번호 (예: "R25BK01187770-000")
+ * @returns 나라장터 상세 페이지 URL
+ */
+export const getNaraJangteoUrl = (announcementNumber?: string): string | null => {
+  if (!announcementNumber) return null;
+  
+  // 공고번호 형식: "R25BK01187770-000" 또는 "R25BK01187770"
+  const parts = announcementNumber.split('-');
+  const bidPbancNo = parts[0]; // 하이픈 앞 부분
+  const bidPbancOrd = parts[1] || '000'; // 하이픈 뒤 부분, 없으면 기본값 '000'
+  
+  return `https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=${bidPbancNo}&bidPbancOrd=${bidPbancOrd}`;
+};
+
 
