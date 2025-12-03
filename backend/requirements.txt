@@ -9,5 +9,6 @@ requests==2.31.0
 pdfplumber==0.11.8
 slack-sdk==3.27.1
 certifi==2024.2.2
+pyhwp==0.1b12
 
 
