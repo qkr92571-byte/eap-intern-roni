@@ -34,10 +34,6 @@ export const useAnnouncements = (options: UseAnnouncementsOptions = {}) => {
     } catch (err: any) {
       const errorMessage = err.message || '공고 목록을 불러오는데 실패했습니다.';
       setError(errorMessage);
-      
-      if (err.message?.includes('Network Error') || err.code === 'ECONNREFUSED') {
-        console.error('백엔드 서버가 실행되지 않았습니다.');
-      }
     } finally {
       setLoading(false);
     }

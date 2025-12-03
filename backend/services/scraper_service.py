@@ -138,15 +138,55 @@ def run_scraper(keywords=None, request_date=None):
             if page.is_closed():
                 raise Exception("페이지가 서브메뉴 클릭 전에 닫혔습니다")
             
-            # 서브메뉴 요소 존재 확인
-            submenu_exists = page.evaluate(f"""
+            # 서브메뉴 요소 확인 및 클릭 (다른 프로젝트 방식 적용)
+            # JavaScript로 먼저 요소 존재 확인
+            menu_info = page.evaluate(f"""
                 () => {{
                     const el = document.getElementById('{menu_bid_list_id}');
-                    return el !== null;
+                    if (el) {{
+                        return {{
+                            exists: true,
+                            tagName: el.tagName,
+                            text: el.innerText.trim(),
+                            visible: el.offsetParent !== null
+                        }};
+                    }}
+                    return {{ exists: false }};
                 }}
             """)
             
-            if not submenu_exists:
+            if menu_info and menu_info.get('exists'):
+                print(f"  ✅ 입찰공고목록 메뉴 발견!")
+                print(f"      태그: {menu_info.get('tagName', 'N/A')}")
+                print(f"      텍스트: {menu_info.get('text', 'N/A')[:50]}")
+                print(f"      표시 여부: {menu_info.get('visible', False)}")
+                
+                # 클릭 전 URL 저장
+                url_before = page.url
+                print(f"  📍 클릭 전 URL: {url_before}")
+                
+                # 페이지 상태 재확인
+                if page.is_closed():
+                    raise Exception("페이지가 클릭 전에 닫혔습니다")
+                
+                # JavaScript로 직접 클릭 (더 안정적)
+                js_clicked = page.evaluate(f"""
+                    () => {{
+                        const el = document.getElementById('{menu_bid_list_id}');
+                        if (el) {{
+                            el.click();
+                            return true;
+                        }}
+                        return false;
+                    }}
+                """)
+                
+                if js_clicked:
+                    print(f"  ✅ JavaScript 클릭 성공!")
+                    time.sleep(3)  # 페이지 이동 대기
+                else:
+                    raise Exception(f"입찰공고목록 메뉴 클릭 실패 (ID: {menu_bid_list_id})")
+            else:
                 print("  ⚠️  입찰공고목록 서브메뉴 요소를 찾을 수 없습니다.")
                 print("  ⚠️  페이지 구조가 변경되었거나, 메뉴가 아직 로드되지 않았을 수 있습니다.")
                 # 현재 URL 및 페이지 상태 확인
@@ -158,34 +198,30 @@ def run_scraper(keywords=None, request_date=None):
                 time.sleep(5)
                 
                 # 재확인
-                submenu_exists = page.evaluate(f"""
-                    () => {{
-                        const el = document.getElementById('{menu_bid_list_id}');
-                        return el !== null;
-                    }}
-                """)
-                
-                if not submenu_exists:
+                menu_bid_list = page.locator(f'#{menu_bid_list_id}')
+                if menu_bid_list.count() > 0:
+                    try:
+                        menu_bid_list.click(timeout=5000)
+                        print(f"  ✅ 재시도 클릭 성공!")
+                        time.sleep(3)
+                    except:
+                        page.evaluate(f"""
+                            () => {{
+                                const el = document.getElementById('{menu_bid_list_id}');
+                                if (el) el.click();
+                            }}
+                        """)
+                        time.sleep(3)
+                else:
                     raise Exception(f"입찰공고목록 서브메뉴를 찾을 수 없습니다. 메뉴 ID: {menu_bid_list_id}")
-            
-            page.evaluate(f"""
-                () => {{
-                    const el = document.getElementById('{menu_bid_list_id}');
-                    if (el) {{
-                        el.click();
-                    }}
-                }}
-            """)
             
             # 페이지 로딩 대기 (중요: 메뉴 클릭 후 페이지 이동 대기)
             try:
-                page.wait_for_load_state('networkidle', timeout=15000)
+                page.wait_for_load_state('networkidle', timeout=20000)
                 print("  ✅ 네트워크 로딩 완료")
             except Exception as e:
                 print(f"  ⚠️  네트워크 대기 시간 초과: {str(e)}")
                 print("  ⚠️  계속 진행하지만 페이지가 완전히 로드되지 않았을 수 있습니다.")
-            
-            time.sleep(3)
             
             # 페이지 상태 최종 확인
             if page.is_closed():
@@ -193,7 +229,12 @@ def run_scraper(keywords=None, request_date=None):
             
             # 현재 URL 확인 (페이지 이동 확인)
             current_url = page.url
-            print(f"  현재 URL: {current_url}")
+            print(f"  📍 클릭 후 URL: {current_url}")
+            
+            if url_before != current_url:
+                print("  ✅ URL이 변경되었습니다!")
+            else:
+                print("  ⚠️ URL이 변경되지 않았습니다. (SPA일 수 있음)")
             
             print("  ✅ 입찰공고목록 메뉴 클릭 완료")
             print("  ✅ 입찰공고목록 페이지 이동 완료!")
@@ -294,46 +335,66 @@ def search_by_keyword(page, keyword, request_date=None, is_first_keyword=False):
         # 0. 첫 번째 키워드에서만 날짜 범위 설정
         if is_first_keyword:
             print("  날짜 범위 설정 중...")
-            date_range_id = 'wq_uuid_2223_grpCalRoot'
-            date_range_element = page.locator(f'#{date_range_id}')
             
-            if date_range_element.count() > 0:
-                # 날짜 범위 계산 (14일 전 ~ 오늘)
-                if request_date is None:
-                    request_date = datetime.now()
-                end_date = request_date
-                start_date = end_date - timedelta(days=14)
+            # 페이지 상태 재확인
+            if page.is_closed():
+                raise Exception("페이지가 날짜 범위 설정 전에 닫혔습니다")
+            
+            date_range_id = 'wq_uuid_2223_grpCalRoot'
+            
+            # JavaScript로 요소 존재 확인 (다른 프로젝트 방식)
+            date_range_exists = page.evaluate(f"""
+                () => {{
+                    const el = document.getElementById('{date_range_id}');
+                    return el !== null;
+                }}
+            """)
+            
+            if date_range_exists:
+                date_range_element = page.locator(f'#{date_range_id}')
                 
-                start_date_str = start_date.strftime('%Y%m%d')
-                end_date_str = end_date.strftime('%Y%m%d')
-                
-                # 내부 input 요소 찾기
-                date_inputs = page.evaluate(f"""
-                    () => {{
-                        const container = document.getElementById('{date_range_id}');
-                        if (container) {{
-                            const inputs = container.querySelectorAll('input[type="text"], input[type="date"]');
-                            return Array.from(inputs).map(inp => ({{
-                                id: inp.id || '',
-                                name: inp.name || '',
-                                value: inp.value || ''
-                            }}));
-                        }}
-                        return [];
-                    }}
-                """)
-                
-                if len(date_inputs) >= 1:
-                    start_input = page.locator(f'#{date_inputs[0]["id"]}')
-                    start_input.fill(start_date_str)
-                    time.sleep(0.5)
-                
-                if len(date_inputs) >= 2:
-                    end_input = page.locator(f'#{date_inputs[1]["id"]}')
-                    end_input.fill(end_date_str)
-                    time.sleep(0.5)
-                
-                print(f"  ✅ 날짜 범위 설정 완료: {start_date_str} ~ {end_date_str}")
+                try:
+                    if date_range_element.count() > 0:
+                        # 날짜 범위 계산 (14일 전 ~ 오늘)
+                        if request_date is None:
+                            request_date = datetime.now()
+                        end_date = request_date
+                        start_date = end_date - timedelta(days=14)
+                        
+                        start_date_str = start_date.strftime('%Y%m%d')
+                        end_date_str = end_date.strftime('%Y%m%d')
+                        
+                        # 내부 input 요소 찾기
+                        date_inputs = page.evaluate(f"""
+                            () => {{
+                                const container = document.getElementById('{date_range_id}');
+                                if (container) {{
+                                    const inputs = container.querySelectorAll('input[type="text"], input[type="date"]');
+                                    return Array.from(inputs).map(inp => ({{
+                                        id: inp.id || '',
+                                        name: inp.name || '',
+                                        value: inp.value || ''
+                                    }}));
+                                }}
+                                return [];
+                            }}
+                        """)
+                        
+                        if len(date_inputs) >= 1:
+                            start_input = page.locator(f'#{date_inputs[0]["id"]}')
+                            start_input.fill(start_date_str)
+                            time.sleep(0.5)
+                        
+                        if len(date_inputs) >= 2:
+                            end_input = page.locator(f'#{date_inputs[1]["id"]}')
+                            end_input.fill(end_date_str)
+                            time.sleep(0.5)
+                        
+                        print(f"  ✅ 날짜 범위 설정 완료: {start_date_str} ~ {end_date_str}")
+                    else:
+                        print("  ⚠️  날짜 범위 컨테이너를 찾지 못함 (계속 진행)")
+                except Exception as e:
+                    print(f"  ⚠️  날짜 범위 설정 중 오류: {e} (계속 진행)")
             else:
                 print("  ⚠️  날짜 범위 컨테이너를 찾지 못함 (계속 진행)")
         
