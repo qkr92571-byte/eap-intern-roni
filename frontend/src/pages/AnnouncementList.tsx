@@ -11,38 +11,27 @@ import {
   TableRow,
   Paper,
   Chip,
-  IconButton,
   TextField,
   InputAdornment,
-  Card,
-  CardContent,
-  Grid,
   Button,
   Menu,
   MenuItem,
-  Stack,
-  Divider,
   Tabs,
   Tab,
 } from '@mui/material';
 import {
   Search,
-  Visibility,
   Sort,
-  ViewList,
-  ViewModule,
 } from '@mui/icons-material';
 import { useAnnouncements } from '../hooks/useAnnouncements';
-import { Announcement, AnnouncementStatus } from '../types';
+import { Announcement } from '../types';
 import { formatBudget, formatDateShort } from '../utils/formatters';
-import StatusChip from '../components/StatusChip';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 100 });
   const [searchTerm, setSearchTerm] = useState('');
   const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
@@ -142,12 +131,6 @@ const AnnouncementList: React.FC = () => {
               예산순
             </MenuItem>
           </Menu>
-          <IconButton
-            onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
-            color={viewMode === 'table' ? 'primary' : 'default'}
-          >
-            {viewMode === 'table' ? <ViewModule /> : <ViewList />}
-          </IconButton>
         </Box>
       </Box>
 
@@ -164,207 +147,94 @@ const AnnouncementList: React.FC = () => {
       </Tabs>
 
       {/* 테이블 뷰 */}
-      {viewMode === 'table' && (
-        <TableContainer component={Paper} elevation={2}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'grey.100' }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>공고번호</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>제목</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>기관</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>사업구분</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>예산금액</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>게시일</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>마감일</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>검수결과</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>수집일</TableCell>
+      <TableContainer component={Paper} elevation={2}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: 'grey.100' }}>
+              <TableCell sx={{ fontWeight: 'bold' }}>공고번호</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>기관</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>사업구분</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>예산금액</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>게시일</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>마감일</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>검수결과</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>수집일</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredAnnouncements.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <Typography color="textSecondary">
+                    {searchTerm || reviewFilter !== 'all'
+                      ? '검색 조건에 맞는 공고가 없습니다.' 
+                      : '공고가 없습니다.'}
+                  </Typography>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredAnnouncements.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Typography color="textSecondary">
-                      {searchTerm || reviewFilter !== 'all'
-                        ? '검색 조건에 맞는 공고가 없습니다.' 
-                        : '공고가 없습니다.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAnnouncements.map((announcement) => (
-                  <TableRow 
-                    key={announcement.id} 
-                    hover
-                    sx={{ 
-                      '&:hover': { backgroundColor: 'action.hover' },
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => navigate(`/announcements/${announcement.id}`)}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" color="primary" fontWeight="medium">
-                        {announcement.announcement_number || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium" sx={{ maxWidth: 300 }}>
-                        {announcement.title || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{announcement.agency || '-'}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={announcement.business_type || '-'} 
-                        size="small" 
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium" color="primary">
-                        {formatBudget(announcement.budget_amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {announcement.publish_date || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{announcement.deadline || '-'}</TableCell>
-                    <TableCell>
-                      {announcement.reviewed ? (
-                        <Chip
-                          label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
-                          color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
-                          size="small"
-                        />
-                      ) : (
-                        <Chip label="미검수" color="default" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption" color="textSecondary">
-                        {formatDateShort(announcement.created_at)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      {/* 카드 뷰 */}
-      {viewMode === 'card' && (
-        <Grid container spacing={3}>
-          {filteredAnnouncements.length === 0 ? (
-            <Grid item xs={12}>
-              <Paper sx={{ p: 4, textAlign: 'center' }}>
-                <Typography color="textSecondary">
-                  {searchTerm || reviewFilter !== 'all'
-                    ? '검색 조건에 맞는 공고가 없습니다.' 
-                    : '공고가 없습니다.'}
-                </Typography>
-              </Paper>
-            </Grid>
-          ) : (
-            filteredAnnouncements.map((announcement) => (
-              <Grid item xs={12} md={6} lg={4} key={announcement.id}>
-                <Card 
-                  elevation={2}
+            ) : (
+              filteredAnnouncements.map((announcement) => (
+                <TableRow 
+                  key={announcement.id} 
+                  hover
                   sx={{ 
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 4,
-                      cursor: 'pointer'
-                    }
+                    '&:hover': { backgroundColor: 'action.hover' },
+                    cursor: 'pointer'
                   }}
                   onClick={() => navigate(`/announcements/${announcement.id}`)}
                 >
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="start" mb={1}>
-                      <Box display="flex" gap={1} alignItems="center">
-                        <StatusChip status={announcement.status as AnnouncementStatus} />
-                        {announcement.reviewed && (
-                          <Chip
-                            label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
-                            color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                      <Typography variant="caption" color="textSecondary">
-                        {formatDateShort(announcement.created_at)}
-                      </Typography>
-                    </Box>
-                    
-                    <Typography 
-                      variant="h6" 
-                      component="h3" 
-                      gutterBottom
-                      sx={{ 
-                        fontWeight: 'bold',
-                        mb: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                      }}
-                    >
-                      {announcement.title || '제목 없음'}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="primary" fontWeight="medium" mb={1}>
+                  <TableCell>
+                    <Typography variant="body2" color="primary" fontWeight="medium">
                       {announcement.announcement_number || '-'}
                     </Typography>
-                    
-                    <Divider sx={{ my: 1.5 }} />
-                    
-                    <Stack spacing={1}>
-                      <Box display="flex" justifyContent="space-between">
-                        <Typography variant="caption" color="textSecondary">기관</Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {announcement.agency || '-'}
-                        </Typography>
-                      </Box>
-                      
-                      {announcement.business_type && (
-                        <Box display="flex" justifyContent="space-between">
-                          <Typography variant="caption" color="textSecondary">사업구분</Typography>
-                          <Chip label={announcement.business_type} size="small" variant="outlined" />
-                        </Box>
-                      )}
-                      
-                      {announcement.budget_amount && (
-                        <Box display="flex" justifyContent="space-between">
-                          <Typography variant="caption" color="textSecondary">예산금액</Typography>
-                          <Typography variant="body2" fontWeight="bold" color="primary">
-                            {formatBudget(announcement.budget_amount)}
-                          </Typography>
-                        </Box>
-                      )}
-                      
-                      {announcement.deadline && (
-                        <Box display="flex" justifyContent="space-between">
-                          <Typography variant="caption" color="textSecondary">마감일</Typography>
-                          <Typography variant="body2">{announcement.deadline}</Typography>
-                        </Box>
-                      )}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))
-          )}
-        </Grid>
-      )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium" sx={{ maxWidth: 300 }}>
+                      {announcement.title || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{announcement.agency || '-'}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={announcement.business_type || '-'} 
+                      size="small" 
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium" color="primary">
+                      {formatBudget(announcement.budget_amount)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {announcement.publish_date || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{announcement.deadline || '-'}</TableCell>
+                  <TableCell>
+                    {announcement.reviewed ? (
+                      <Chip
+                        label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
+                        color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
+                        size="small"
+                      />
+                    ) : (
+                      <Chip label="미검수" color="default" size="small" variant="outlined" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" color="textSecondary">
+                      {formatDateShort(announcement.created_at)}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* 결과 카운트 */}
       {filteredAnnouncements.length > 0 && (
