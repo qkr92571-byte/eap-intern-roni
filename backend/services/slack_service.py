@@ -32,6 +32,8 @@ def send_report_to_slack(
         report_file: 리포트 JSON 파일 경로
         slack_token: Slack Bot Token (없으면 환경변수에서 가져옴)
         channel_id: Slack Channel ID (없으면 환경변수에서 가져옴)
+                    - 공식 전송: C034EQD6W4W (review_and_upload_report.py에서 사용)
+                    - 개발 테스트: 환경변수 SLACK_CHANNEL_ID 사용
     
     Returns:
         전송 성공 여부
