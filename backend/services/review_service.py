@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import openai
 
 from services.file_service import load_report, REPORT_DIR, get_date_string
+from services.prompt_service import get_prompt as get_prompt_from_firestore
 
 load_dotenv()
 
@@ -26,17 +27,24 @@ EAP_REVIEW_PROMPT_PATH = PROMPTS_DIR / 'eap_review_prompt.txt'
 
 def load_eap_review_prompt() -> str:
     """
-    EAP 검수 프롬프트 파일 로드
+    EAP 검수 프롬프트 로드
+    - 우선순위: Firestore → 로컬 파일 → 기본 프롬프트
     
     Returns:
         프롬프트 텍스트
     """
+    # 1. Firestore에서 프롬프트 조회 시도
+    firestore_prompt = get_prompt_from_firestore()
+    if firestore_prompt:
+        return firestore_prompt
+    
+    # 2. 로컬 파일에서 로드 시도
     if EAP_REVIEW_PROMPT_PATH.exists():
         with open(EAP_REVIEW_PROMPT_PATH, 'r', encoding='utf-8') as f:
             return f.read()
-    else:
-        # 기본 프롬프트 (파일이 없을 경우)
-        return """
+    
+    # 3. 기본 프롬프트 (파일이 없을 경우)
+    return """
 근로자지원프로그램(EAP, Employee Assistance Program)은 근로자가 직장이나 가정에서 겪는 다양한 문제로 인해 업무 성과에 부정적인 영향을 받지 않도록, 전문가 상담 및 코칭 등 심리 서비스를 무상으로 제공하는 제도입니다.
 
 다음 공고가 EAP에 적합한지 검토해주세요.

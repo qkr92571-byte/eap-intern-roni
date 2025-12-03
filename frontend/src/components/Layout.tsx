@@ -20,6 +20,7 @@ import {
   Menu as MenuIcon,
   Article as ArticleIcon,
   TrendingUp as TrendingUpIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 192; // 240px의 80%
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const menuItems = [
     { label: '공고 목록', path: '/', icon: <ArticleIcon /> },
     { label: '경쟁사 동향', path: '/competitors', icon: <TrendingUpIcon /> },
+    { label: '설정', path: '/settings', icon: <SettingsIcon /> },
   ];
 
   const handleDrawerToggle = () => {
@@ -56,7 +58,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <List sx={{ py: 1 }}>
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path || 
-            (item.path === '/' && location.pathname.startsWith('/announcements'));
+            (item.path === '/' && location.pathname.startsWith('/announcements')) ||
+            (item.path === '/settings' && location.pathname.startsWith('/settings'));
           
           return (
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>

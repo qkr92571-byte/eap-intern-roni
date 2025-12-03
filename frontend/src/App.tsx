@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import AnnouncementList from './pages/AnnouncementList';
 import AnnouncementDetail from './pages/AnnouncementDetail';
 import CompetitorTrends from './pages/CompetitorTrends';
+import Settings from './pages/Settings';
 
 const theme = createTheme({
   palette: {
@@ -30,6 +31,7 @@ function App() {
             <Route path="/announcements" element={<AnnouncementList />} />
             <Route path="/announcements/:id" element={<AnnouncementDetail />} />
             <Route path="/competitors" element={<CompetitorTrends />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>
       </Router>
