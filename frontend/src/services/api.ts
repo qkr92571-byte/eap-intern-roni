@@ -27,18 +27,18 @@ const getAnnouncementsFromFirestore = async (params?: {
       } as Announcement);
     });
 
-    // 클라이언트 측에서 정렬 (created_at 또는 publish_date 기준)
+    // 클라이언트 측에서 정렬 (created_at 기준, 수집일순)
     announcements.sort((a, b) => {
-      // publish_date 우선, 없으면 created_at 사용
-      const dateA = a.publish_date 
+      // created_at 우선, 없으면 publish_date 사용
+      const dateA = a.created_at 
+        ? new Date(a.created_at).getTime()
+        : a.publish_date 
         ? new Date(a.publish_date.replace(/\//g, '-')).getTime()
-        : a.created_at 
-        ? new Date(a.created_at).getTime() 
         : 0;
-      const dateB = b.publish_date 
+      const dateB = b.created_at 
+        ? new Date(b.created_at).getTime()
+        : b.publish_date 
         ? new Date(b.publish_date.replace(/\//g, '-')).getTime()
-        : b.created_at 
-        ? new Date(b.created_at).getTime() 
         : 0;
       return dateB - dateA; // 내림차순 (최신순)
     });

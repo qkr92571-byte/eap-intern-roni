@@ -24,7 +24,6 @@ import {
   Sort,
 } from '@mui/icons-material';
 import { useAnnouncements } from '../hooks/useAnnouncements';
-import { Announcement } from '../types';
 import { formatBudget, formatDateShort } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -32,7 +31,7 @@ const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 100 });
   const [searchTerm, setSearchTerm] = useState('');
   const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터
-  const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
+  const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('created_at');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
 

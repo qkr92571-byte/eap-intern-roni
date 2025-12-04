@@ -20,12 +20,14 @@ from services.firebase_service import init_firebase, save_announcement, check_du
 from services.file_service import load_report, REPORT_DIR, get_date_string
 from services.slack_service import send_report_to_slack
 
-def review_and_upload_report(report_date=None):
+def review_and_upload_report(report_date=None, skip_slack=False, auto_upload=False):
     """
     리포트 검수 및 Firestore 업로드 통합 프로세스
     
     Args:
         report_date: 날짜 (기본값: 오늘)
+        skip_slack: 슬랙 전송 건너뛰기 여부 (기본값: False)
+        auto_upload: Firestore 업로드 자동 진행 여부 (기본값: False)
     """
     if report_date is None:
         report_date = datetime.now()
@@ -84,9 +86,13 @@ def review_and_upload_report(report_date=None):
         print()
         
         # 사용자 컨펌 요청
-        print("⚠️  Firestore 업로드를 진행하시겠습니까?")
-        print("   이 작업은 데이터베이스에 데이터를 저장합니다.")
-        user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
+        if auto_upload:
+            print("✅ 자동 업로드 모드: Firestore 업로드를 진행합니다...")
+            user_input = 'yes'
+        else:
+            print("⚠️  Firestore 업로드를 진행하시겠습니까?")
+            print("   이 작업은 데이터베이스에 데이터를 저장합니다.")
+            user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
         
         if user_input not in ['yes', 'y']:
             print("❌ 사용자가 업로드를 취소했습니다.")
@@ -161,40 +167,43 @@ def review_and_upload_report(report_date=None):
         print("\n[4단계] 슬랙 메시지 전송")
         print("-" * 60)
         
-        report_file = REPORT_DIR / f'report_{get_date_string(report_date)}.json'
-        if not report_file.exists():
-            print("⚠️  리포트 파일을 찾을 수 없어 슬랙 전송을 건너뜁니다.")
+        if skip_slack:
+            print("⚠️  슬랙 전송이 건너뛰어졌습니다.")
         else:
-            # 개발 테스트 채널로 먼저 전송
-            dev_channel_id = os.getenv('SLACK_CHANNEL_ID')
-            PRODUCTION_CHANNEL_ID = 'C034EQD6W4W'
-            
-            if dev_channel_id:
-                print(f"1. 개발 테스트 채널로 전송: {dev_channel_id}")
-                dev_success = send_report_to_slack(str(report_file), channel_id=dev_channel_id)
-                if dev_success:
-                    print("   ✅ 개발 테스트 채널 전송 완료")
-                else:
-                    print("   ⚠️  개발 테스트 채널 전송 실패")
-                print()
-            
-            # 사용자 컨펌 요청 (공식 채널 전송)
-            print("⚠️  공식 채널로 슬랙 메시지를 전송하시겠습니까?")
-            print(f"   공식 채널: {PRODUCTION_CHANNEL_ID}")
-            print("   이 작업은 공식 슬랙 채널에 리포트 메시지를 전송합니다.")
-            user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
-            
-            if user_input not in ['yes', 'y']:
-                print("❌ 사용자가 공식 채널 전송을 취소했습니다.")
-                print("   공식 채널 전송을 건너뜁니다.")
+            report_file = REPORT_DIR / f'report_{get_date_string(report_date)}.json'
+            if not report_file.exists():
+                print("⚠️  리포트 파일을 찾을 수 없어 슬랙 전송을 건너뜁니다.")
             else:
-                print("✅ 사용자 컨펌 확인됨. 공식 채널로 전송을 시작합니다...")
+                # 개발 테스트 채널로 먼저 전송
+                dev_channel_id = os.getenv('SLACK_CHANNEL_ID')
+                PRODUCTION_CHANNEL_ID = 'C034EQD6W4W'
+                
+                if dev_channel_id:
+                    print(f"1. 개발 테스트 채널로 전송: {dev_channel_id}")
+                    dev_success = send_report_to_slack(str(report_file), channel_id=dev_channel_id)
+                    if dev_success:
+                        print("   ✅ 개발 테스트 채널 전송 완료")
+                    else:
+                        print("   ⚠️  개발 테스트 채널 전송 실패")
+                    print()
+                
+                # 사용자 컨펌 요청 (공식 채널 전송)
+                print("⚠️  공식 채널로 슬랙 메시지를 전송하시겠습니까?")
                 print(f"   공식 채널: {PRODUCTION_CHANNEL_ID}")
-                prod_success = send_report_to_slack(str(report_file), channel_id=PRODUCTION_CHANNEL_ID)
-                if prod_success:
-                    print("✅ 공식 채널 슬랙 메시지 전송 완료")
+                print("   이 작업은 공식 슬랙 채널에 리포트 메시지를 전송합니다.")
+                user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
+                
+                if user_input not in ['yes', 'y']:
+                    print("❌ 사용자가 공식 채널 전송을 취소했습니다.")
+                    print("   공식 채널 전송을 건너뜁니다.")
                 else:
-                    print("⚠️  공식 채널 슬랙 메시지 전송 실패 (환경변수 확인 필요)")
+                    print("✅ 사용자 컨펌 확인됨. 공식 채널로 전송을 시작합니다...")
+                    print(f"   공식 채널: {PRODUCTION_CHANNEL_ID}")
+                    prod_success = send_report_to_slack(str(report_file), channel_id=PRODUCTION_CHANNEL_ID)
+                    if prod_success:
+                        print("✅ 공식 채널 슬랙 메시지 전송 완료")
+                    else:
+                        print("⚠️  공식 채널 슬랙 메시지 전송 실패 (환경변수 확인 필요)")
         
         # 최종 결과 출력
         print("\n" + "=" * 60)
@@ -217,6 +226,21 @@ def review_and_upload_report(report_date=None):
         sys.exit(1)
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='리포트 검수 및 Firestore 업로드')
+    parser.add_argument(
+        '--skip-slack',
+        action='store_true',
+        help='슬랙 메시지 전송 건너뛰기'
+    )
+    parser.add_argument(
+        '--auto-upload',
+        action='store_true',
+        help='Firestore 업로드 자동 진행 (사용자 입력 없이)'
+    )
+    
+    args = parser.parse_args()
     # 오늘 날짜로 검수 및 업로드
-    review_and_upload_report()
+    review_and_upload_report(skip_slack=args.skip_slack, auto_upload=args.auto_upload)
 

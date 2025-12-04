@@ -48,13 +48,31 @@ def run_scraper(keywords=None, request_date=None):
     # 브라우저 실행 및 스크래핑
     with sync_playwright() as p:
         try:
-            # 헤드리스 모드 설정 (환경변수 또는 기본값)
-            headless_env = os.getenv('PLAYWRIGHT_HEADLESS', 'false').lower()
+            # 헤드리스 모드 설정 (환경변수 또는 기본값 True)
+            # 기본값을 True로 변경하여 브라우저 크래시 방지
+            headless_env = os.getenv('PLAYWRIGHT_HEADLESS', 'true').lower()
             headless = headless_env in ('true', '1', 'yes')
             
-            print(f"브라우저 실행 중... (Playwright Chromium, headless={headless})")
-            browser = p.chromium.launch(headless=headless)
-            print("  ✅ 브라우저 실행 성공")
+            print(f"브라우저 실행 중... (Playwright, headless={headless})")
+            
+            # 다른 프로젝트 로직 적용: Firefox 먼저 시도, 실패 시 Chromium with 크래시 방지 옵션
+            try:
+                browser = p.firefox.launch(headless=headless)
+                print("  ✅ Firefox 브라우저로 실행")
+            except Exception as e:
+                print(f"  ⚠️  Firefox 실행 실패, Chromium 재시도: {e}")
+                # macOS 크래시 방지를 위한 추가 옵션 (다른 프로젝트 로직 적용)
+                browser = p.chromium.launch(
+                    headless=headless,
+                    args=[
+                        '--disable-gpu',
+                        '--disable-software-rasterizer',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox'
+                    ]
+                )
+                print("  ✅ Chromium 브라우저로 실행 (크래시 방지 옵션 적용)")
             
             context = browser.new_context(
                 viewport={'width': 1920, 'height': 1080},

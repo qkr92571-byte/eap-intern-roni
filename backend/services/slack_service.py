@@ -73,7 +73,12 @@ def send_report_to_slack(
         
         # 리포트 정보 추출
         total_count = len(announcements)
-        approved_count = sum(1 for a in announcements if a.get('status') == 'approved')
+        # 실제로 EAP와 관련이 있는 적합 공고만 카운트
+        approved_count = sum(1 for a in announcements 
+                           if a.get('status') == 'approved' 
+                           and ('근로자지원프로그램' in a.get('title', '') 
+                                or 'EAP' in a.get('title', '') 
+                                or 'employee assistance program' in a.get('title', '').lower()))
         rejected_count = sum(1 for a in announcements if a.get('status') == 'rejected')
         pending_count = sum(1 for a in announcements if not a.get('reviewed', False))
         
@@ -101,7 +106,16 @@ def send_report_to_slack(
             }
         })
         
-        # 2. 검색일자
+        # 2. 유저 그룹 멘션 (EAP 파트)
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "<!subteam^S08SE5ZTPQD|@eap파트>"
+            }
+        })
+        
+        # 3. 검색일자
         blocks.append({
             "type": "section",
             "text": {
@@ -110,7 +124,7 @@ def send_report_to_slack(
             }
         })
         
-        # 3. 통계 정보
+        # 4. 통계 정보
         stats_text = f":clipboard: *신규 공고*\n총 {total_count}개"
         if approved_count > 0 or rejected_count > 0 or pending_count > 0:
             stats_text += f"\n  • 적합: {approved_count}개"
@@ -125,8 +139,18 @@ def send_report_to_slack(
             }
         })
         
-        # 4. 적합 공고 목록 (최대 5개)
-        approved_announcements = [a for a in announcements if a.get('status') == 'approved'][:5]
+        # 5. 적합 공고 목록 (최대 5개)
+        # 실제로 EAP와 관련이 있는 공고만 필터링 (제목에 "근로자지원프로그램" 또는 "EAP" 포함)
+        all_approved = [a for a in announcements if a.get('status') == 'approved']
+        approved_announcements = []
+        for ann in all_approved:
+            title = ann.get('title', '')
+            # 실제로 EAP와 관련이 있는 공고만 포함
+            if '근로자지원프로그램' in title or 'EAP' in title or 'employee assistance program' in title.lower():
+                approved_announcements.append(ann)
+        
+        approved_announcements = approved_announcements[:5]  # 최대 5개
+        
         if approved_announcements:
             approved_text = ":white_check_mark: *적합 공고 (최대 5개)*\n"
             for i, ann in enumerate(approved_announcements, 1):
@@ -144,7 +168,7 @@ def send_report_to_slack(
                 }
             })
         
-        # 5. 전체 리포트 링크 (프론트엔드 URL)
+        # 6. 전체 리포트 링크 (프론트엔드 URL)
         frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.41:3000')
         blocks.append({
             "type": "section",
