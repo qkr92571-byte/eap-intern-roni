@@ -174,18 +174,8 @@ def review_and_upload_report(report_date=None, skip_slack=False, auto_upload=Fal
             if not report_file.exists():
                 print("⚠️  리포트 파일을 찾을 수 없어 슬랙 전송을 건너뜁니다.")
             else:
-                # 개발 테스트 채널로 먼저 전송
-                dev_channel_id = os.getenv('SLACK_CHANNEL_ID')
+                # 공식 채널로 전송
                 PRODUCTION_CHANNEL_ID = 'C034EQD6W4W'
-                
-                if dev_channel_id:
-                    print(f"1. 개발 테스트 채널로 전송: {dev_channel_id}")
-                    dev_success = send_report_to_slack(str(report_file), channel_id=dev_channel_id)
-                    if dev_success:
-                        print("   ✅ 개발 테스트 채널 전송 완료")
-                    else:
-                        print("   ⚠️  개발 테스트 채널 전송 실패")
-                    print()
                 
                 # 사용자 컨펌 요청 (공식 채널 전송)
                 print("⚠️  공식 채널로 슬랙 메시지를 전송하시겠습니까?")
@@ -242,5 +232,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     # 오늘 날짜로 검수 및 업로드
-    review_and_upload_report(skip_slack=args.skip_slack, auto_upload=args.auto_upload)
+    # 기본적으로 슬랙 전송은 건너뛰기 (중복 방지)
+    # 슬랙 전송이 필요하면 --skip-slack 플래그를 사용하지 않거나 별도로 전송
+    review_and_upload_report(skip_slack=True, auto_upload=args.auto_upload)
 

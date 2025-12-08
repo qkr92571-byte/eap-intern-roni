@@ -65,7 +65,21 @@ def send_report_to_slack(
             return False
         
         with open(report_path, 'r', encoding='utf-8') as f:
-            announcements = json.load(f)
+            report_data = json.load(f)
+        
+        # 리포트 데이터가 딕셔너리인 경우 (메타데이터 포함)
+        if isinstance(report_data, dict):
+            announcements = report_data.get('announcements', [])
+            # 이미 전송된 경우 중복 방지
+            if report_data.get('slack_sent', False):
+                print(f"⚠️  이 리포트는 이미 슬랙으로 전송되었습니다.")
+                print(f"   중복 전송을 방지하기 위해 건너뜁니다.")
+                return True
+        elif isinstance(report_data, list):
+            announcements = report_data
+        else:
+            print("❌ 리포트 파일 형식이 올바르지 않습니다.")
+            return False
         
         if not isinstance(announcements, list):
             print("❌ 리포트 파일 형식이 올바르지 않습니다.")
@@ -194,6 +208,29 @@ def send_report_to_slack(
             blocks=blocks,
             text=f"EAP 공고 리포트 - {formatted_date}"
         )
+        
+        # 리포트 파일에 전송 기록 저장 (중복 방지)
+        try:
+            with open(report_path, 'r', encoding='utf-8') as f:
+                report_data = json.load(f)
+            
+            # 리포트 데이터가 리스트인 경우 딕셔너리로 변환
+            if isinstance(report_data, list):
+                report_data = {
+                    'announcements': report_data,
+                    'slack_sent': True,
+                    'slack_sent_at': datetime.now().isoformat(),
+                    'slack_channel': channel_id
+                }
+            else:
+                report_data['slack_sent'] = True
+                report_data['slack_sent_at'] = datetime.now().isoformat()
+                report_data['slack_channel'] = channel_id
+            
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(report_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️  전송 기록 저장 실패 (무시): {str(e)}")
         
         print(f"✅ 슬랙 메시지 전송 완료!")
         print(f"   메시지 타임스탬프: {response['ts']}")

@@ -45,7 +45,7 @@ def test_scraper():
     print()
     
     try:
-        results = run_scraper(keywords=keywords[:2] if len(keywords) >= 2 else keywords, request_date=request_date)
+        results = run_scraper(keywords=keywords, request_date=request_date)
         
         print()
         print("4. 수집 결과:")
