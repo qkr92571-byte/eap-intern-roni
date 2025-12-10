@@ -278,16 +278,7 @@ def review_announcement_with_chatgpt(announcement: Dict) -> Dict:
     """
     try:
         # OpenAI 클라이언트 초기화
-        # httpx 클라이언트를 명시적으로 생성하여 proxies 문제 해결
-        import httpx
-        http_client = httpx.Client(
-            timeout=60.0,
-            # proxies 파라미터 제외
-        )
-        client = openai.OpenAI(
-            api_key=OPENAI_API_KEY,
-            http_client=http_client
-        )
+        client = get_openai_client()
         
         # 검수 프롬프트 작성
         title = announcement.get('title', '')

@@ -91,12 +91,8 @@ def send_report_to_slack(
         
         # 리포트 정보 추출
         total_count = len(announcements)
-        # 실제로 EAP와 관련이 있는 적합 공고만 카운트
-        approved_count = sum(1 for a in announcements 
-                           if a.get('status') == 'approved' 
-                           and ('근로자지원프로그램' in a.get('title', '') 
-                                or 'EAP' in a.get('title', '') 
-                                or 'employee assistance program' in a.get('title', '').lower()))
+        # 상태 기준 집계 (키워드 필터로 누락되던 문제 수정)
+        approved_count = sum(1 for a in announcements if a.get('status') == 'approved')
         rejected_count = sum(1 for a in announcements if a.get('status') == 'rejected')
         pending_count = sum(1 for a in announcements if not a.get('reviewed', False))
         
@@ -124,12 +120,14 @@ def send_report_to_slack(
             }
         })
         
-        # 2. 유저 그룹 멘션 (EAP 파트)
+        # 2. 유저 그룹 멘션 (EAP 파트) - 환경변수 우선
+        usergroup_id = os.getenv('SLACK_EAP_USERGROUP', 'S08SE5ZTPQD')
+        usergroup_mention = f"<!subteam^{usergroup_id}|@eap파트>"
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "<!subteam^S08SE5ZTPQD|@eap파트>"
+                "text": usergroup_mention
             }
         })
         
@@ -210,7 +208,7 @@ def send_report_to_slack(
         response = client.chat_postMessage(
             channel=channel_id,
             blocks=blocks,
-            text=f"EAP 공고 리포트 - {formatted_date}"
+            text=f"{usergroup_mention} EAP 공고 리포트 - {formatted_date}"
         )
         
         # 리포트 파일에 전송 기록 저장 (중복 방지)

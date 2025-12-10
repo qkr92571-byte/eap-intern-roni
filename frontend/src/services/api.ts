@@ -24,10 +24,10 @@ const getAnnouncementsFromFirestore = async (params?: {
       // display_status가 없거나 20인 것만 표시 (40은 삭제됨)
       const displayStatus = data.display_status ?? 20; // 기본값 20
       if (displayStatus === 20) {
-        announcements.push({
-          id: docSnap.id,
-          ...data,
-        } as Announcement);
+      announcements.push({
+        id: docSnap.id,
+        ...data,
+      } as Announcement);
       }
     });
 
