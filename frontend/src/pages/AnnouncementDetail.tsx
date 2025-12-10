@@ -10,10 +10,22 @@ import {
   Grid,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Menu,
+  MenuItem,
+  IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { getAnnouncementById } from '../services/api';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { getAnnouncementById, updateAnnouncementStatus, deleteAnnouncement } from '../services/api';
 import { Announcement } from '../types';
 import { formatBudget, formatDateShort, getNaraJangteoUrl } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -23,6 +35,9 @@ const AnnouncementDetail: React.FC = () => {
   const navigate = useNavigate();
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   useEffect(() => {
     if (id) {
@@ -41,6 +56,59 @@ const AnnouncementDetail: React.FC = () => {
       console.error('공고 상세 정보 로드 실패:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: 'approved' | 'rejected') => {
+    if (!id || !announcement) return;
+
+    try {
+      setUpdating(true);
+      const response = await updateAnnouncementStatus(id, newStatus);
+      
+      if (response.success) {
+        // 로컬 상태 업데이트
+        setAnnouncement({
+          ...announcement,
+          status: newStatus,
+          reviewed: true,
+        });
+        setMenuAnchor(null);
+      } else {
+        alert(response.error || '상태 변경에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('상태 변경 실패:', error);
+      alert('상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setMenuAnchor(null);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!id) return;
+
+    try {
+      setUpdating(true);
+      const response = await deleteAnnouncement(id);
+      
+      if (response.success) {
+        alert('공고가 삭제되었습니다.');
+        navigate('/announcements');
+      } else {
+        alert(response.error || '삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('삭제 실패:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setUpdating(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -131,6 +199,45 @@ const AnnouncementDetail: React.FC = () => {
                 </Button>
               ) : null;
             })()}
+            <IconButton
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              disabled={updating}
+            >
+              <MoreVertIcon />
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+            >
+              {announcement.status !== 'approved' && (
+                <MenuItem
+                  onClick={() => handleStatusChange('approved')}
+                  disabled={updating}
+                >
+                  <CheckCircleIcon sx={{ mr: 1, color: 'success.main' }} />
+                  적합으로 변경
+                </MenuItem>
+              )}
+              {announcement.status !== 'rejected' && (
+                <MenuItem
+                  onClick={() => handleStatusChange('rejected')}
+                  disabled={updating}
+                >
+                  <CancelIcon sx={{ mr: 1, color: 'error.main' }} />
+                  부적합으로 변경
+                </MenuItem>
+              )}
+              <Divider />
+              <MenuItem
+                onClick={handleDeleteClick}
+                disabled={updating}
+                sx={{ color: 'error.main' }}
+              >
+                <DeleteIcon sx={{ mr: 1 }} />
+                삭제
+              </MenuItem>
+            </Menu>
           </Box>
         </Box>
 
@@ -302,6 +409,40 @@ const AnnouncementDetail: React.FC = () => {
           </Typography>
         </Box>
       </Paper>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>공고 삭제 확인</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            정말로 이 공고를 삭제하시겠습니까?
+            <br />
+            <strong>{announcement.title}</strong>
+            <br />
+            <br />
+            공고는 숨김 처리되며, 목록에서 보이지 않게 됩니다.
+            <br />
+            실수로 삭제한 경우, DB에서 display_status를 20으로 변경하면 다시 표시됩니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={updating}>
+            취소
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={updating}
+            startIcon={<DeleteIcon />}
+          >
+            삭제
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

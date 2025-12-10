@@ -28,6 +28,9 @@ export interface Announcement {
   review_result?: string;  // 검수 결과
   source?: string;  // 출처 (기본값: '나라장터')
   
+  // 표시 상태 필드
+  display_status?: number;  // 20: 노출, 40: 삭제됨 (숨김)
+  
   // 서비스 항목 필드
   service_items?: ServiceItem[];  // 요구 서비스 항목 리스트
   service_items_extracted_at?: string;  // 서비스 항목 추출 일시

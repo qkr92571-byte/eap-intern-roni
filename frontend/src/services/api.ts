@@ -21,10 +21,14 @@ const getAnnouncementsFromFirestore = async (params?: {
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as any;
-      announcements.push({
-        id: docSnap.id,
-        ...data,
-      } as Announcement);
+      // display_status가 없거나 20인 것만 표시 (40은 삭제됨)
+      const displayStatus = data.display_status ?? 20; // 기본값 20
+      if (displayStatus === 20) {
+        announcements.push({
+          id: docSnap.id,
+          ...data,
+        } as Announcement);
+      }
     });
 
     // 클라이언트 측에서 정렬 (created_at 기준, 수집일순)
@@ -111,6 +115,64 @@ export const getAnnouncementById = async (
   id: string
 ): Promise<ApiResponse<Announcement>> => {
   return getAnnouncementByIdFromFirestore(id);
+};
+
+/**
+ * 공고 상태 업데이트
+ */
+export const updateAnnouncementStatus = async (
+  id: string,
+  status: 'approved' | 'rejected' | 'pending'
+): Promise<ApiResponse<void>> => {
+  try {
+    const { updateDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('../config/firebase');
+    
+    const ref = doc(db, 'announcements', id);
+    await updateDoc(ref, {
+      status,
+      reviewed: true,
+    });
+
+    return {
+      success: true,
+      message: '공고 상태가 업데이트되었습니다.',
+    };
+  } catch (error: any) {
+    console.error('공고 상태 업데이트 실패:', error);
+    return {
+      success: false,
+      error: error.message || '공고 상태를 업데이트하는데 실패했습니다.',
+    };
+  }
+};
+
+/**
+ * 공고 삭제 (display_status를 40으로 변경하여 숨김 처리)
+ */
+export const deleteAnnouncement = async (
+  id: string
+): Promise<ApiResponse<void>> => {
+  try {
+    const { updateDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('../config/firebase');
+    
+    const ref = doc(db, 'announcements', id);
+    await updateDoc(ref, {
+      display_status: 40, // 삭제됨 (숨김)
+    });
+
+    return {
+      success: true,
+      message: '공고가 삭제되었습니다. (숨김 처리)',
+    };
+  } catch (error: any) {
+    console.error('공고 삭제 실패:', error);
+    return {
+      success: false,
+      error: error.message || '공고를 삭제하는데 실패했습니다.',
+    };
+  }
 };
 
 // 백엔드 전용 기능들 (프론트엔드에서 사용 불가)

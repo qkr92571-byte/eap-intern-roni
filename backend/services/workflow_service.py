@@ -304,7 +304,8 @@ class WorkflowService:
             'review_model': announcement.get('review_model', ''),
             'reviewed_at': announcement.get('reviewed_at', ''),
             'service_items': announcement.get('service_items'),
-            'service_items_extracted_at': announcement.get('service_items_extracted_at')
+            'service_items_extracted_at': announcement.get('service_items_extracted_at'),
+            'display_status': announcement.get('display_status', 20)  # 20: 노출, 40: 삭제됨
         }
         
         # None 값 제거

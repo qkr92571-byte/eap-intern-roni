@@ -37,6 +37,9 @@ def get_db():
 def save_announcement(announcement_data):
     """공고 데이터를 Firestore에 저장"""
     db = get_db()
+    # display_status 기본값 설정 (없으면 20으로 설정)
+    if 'display_status' not in announcement_data:
+        announcement_data['display_status'] = 20  # 20: 노출, 40: 삭제됨
     doc_ref = db.collection('announcements').add(announcement_data)
     return doc_ref[1].id
 

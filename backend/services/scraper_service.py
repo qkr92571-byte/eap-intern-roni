@@ -738,7 +738,9 @@ def scrape_announcements_from_page(page, request_date=None):
                         'source': '나라장터',
                         # 서비스 항목 필드 (기본값)
                         'service_items': [],
-                        'service_items_extracted_at': None
+                        'service_items_extracted_at': None,
+                        # 표시 상태 필드 (기본값: 20 = 노출)
+                        'display_status': 20
                     }
                 announcements.append(announcement)
             
@@ -858,7 +860,9 @@ def scrape_announcements_from_page(page, request_date=None):
                         'source': '나라장터',
                         # 서비스 항목 필드 (기본값)
                         'service_items': [],
-                        'service_items_extracted_at': None
+                        'service_items_extracted_at': None,
+                        # 표시 상태 필드 (기본값: 20 = 노출)
+                        'display_status': 20
                     }
                     
                     announcements.append(announcement)
