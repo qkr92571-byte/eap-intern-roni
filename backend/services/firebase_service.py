@@ -109,3 +109,48 @@ def delete_announcement(announcement_id):
     db.collection('announcements').document(announcement_id).delete()
     return True
 
+def get_announcement_by_number(announcement_number: str):
+    """
+    공고번호로 공고 조회 및 문서 ID 반환
+    
+    Args:
+        announcement_number: 공고번호
+        
+    Returns:
+        (문서 ID, 공고 데이터) 튜플 또는 (None, None)
+    """
+    if not announcement_number or not announcement_number.strip():
+        return None, None
+    
+    db = get_db()
+    try:
+        query = db.collection('announcements').where('announcement_number', '==', announcement_number.strip()).limit(1)
+        docs = list(query.stream())
+        if len(docs) > 0:
+            doc = docs[0]
+            announcement = doc.to_dict()
+            announcement['id'] = doc.id
+            return doc.id, announcement
+        return None, None
+    except Exception as e:
+        print(f"공고번호로 조회 중 오류: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return None, None
+
+def update_announcement_by_number(announcement_number: str, update_data):
+    """
+    공고번호로 공고 업데이트
+    
+    Args:
+        announcement_number: 공고번호
+        update_data: 업데이트할 데이터 딕셔너리
+        
+    Returns:
+        업데이트 성공 여부
+    """
+    doc_id, _ = get_announcement_by_number(announcement_number)
+    if doc_id:
+        return update_announcement(doc_id, update_data)
+    return False
+

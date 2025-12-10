@@ -27,6 +27,15 @@ export interface Announcement {
   reviewed?: boolean;
   review_result?: string;  // 검수 결과
   source?: string;  // 출처 (기본값: '나라장터')
+  
+  // 서비스 항목 필드
+  service_items?: ServiceItem[];  // 요구 서비스 항목 리스트
+  service_items_extracted_at?: string;  // 서비스 항목 추출 일시
+}
+
+export interface ServiceItem {
+  구분: string;  // 서비스 항목명
+  설명: string;  // 서비스 항목 설명
 }
 
 export type AnnouncementStatus = 'pending' | 'approved' | 'rejected';

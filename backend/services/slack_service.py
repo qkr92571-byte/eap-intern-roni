@@ -7,6 +7,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
+from dotenv import load_dotenv
+
+# 환경변수 로드
+load_dotenv()
 
 try:
     from slack_sdk import WebClient

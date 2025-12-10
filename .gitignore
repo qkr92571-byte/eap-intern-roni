@@ -54,3 +54,6 @@ logs/
 playwright-report/
 test-results/
 
+backend/downloads/
+backend/report/
+backend/history/

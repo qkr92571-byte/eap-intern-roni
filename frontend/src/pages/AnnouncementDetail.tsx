@@ -7,6 +7,9 @@ import {
   Button,
   Divider,
   Chip,
+  Grid,
+  Card,
+  CardContent,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -229,6 +232,66 @@ const AnnouncementDetail: React.FC = () => {
                   {announcement.review_result}
                 </Typography>
               </Paper>
+            </Box>
+          </>
+        )}
+
+        {announcement.service_items && announcement.service_items.length > 0 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                요구 서비스 항목
+              </Typography>
+              <Typography variant="caption" color="textSecondary" sx={{ mb: 2, display: 'block' }}>
+                {announcement.service_items_extracted_at 
+                  ? `추출일시: ${new Date(announcement.service_items_extracted_at).toLocaleString('ko-KR')}`
+                  : '이 공고에서 요구하는 서비스 항목 목록입니다.'}
+              </Typography>
+              <Grid container spacing={2}>
+                {announcement.service_items.map((item, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Card
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': {
+                          boxShadow: 2,
+                          borderColor: 'primary.main',
+                        },
+                        transition: 'all 0.2s ease-in-out',
+                      }}
+                    >
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight="medium" 
+                          gutterBottom
+                          sx={{ mb: 1 }}
+                        >
+                          {item.구분}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          sx={{ 
+                            lineHeight: 1.6,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {item.설명}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
             </Box>
           </>
         )}

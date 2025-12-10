@@ -735,7 +735,10 @@ def scrape_announcements_from_page(page, request_date=None):
                         'publish_date': formatted_publish_date,
                         'business_type': '일반용역',  # 이미 필터링됨
                         'created_at': datetime.now().isoformat(),
-                        'source': '나라장터'
+                        'source': '나라장터',
+                        # 서비스 항목 필드 (기본값)
+                        'service_items': [],
+                        'service_items_extracted_at': None
                     }
                 announcements.append(announcement)
             
@@ -852,7 +855,10 @@ def scrape_announcements_from_page(page, request_date=None):
                         'estimated_price': estimated_price,
                         'business_type': col_2,
                         'created_at': datetime.now().isoformat(),
-                        'source': '나라장터'
+                        'source': '나라장터',
+                        # 서비스 항목 필드 (기본값)
+                        'service_items': [],
+                        'service_items_extracted_at': None
                     }
                     
                     announcements.append(announcement)

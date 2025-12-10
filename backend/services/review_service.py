@@ -10,15 +10,19 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 from dotenv import load_dotenv
-import openai
 
 from services.file_service import load_report, REPORT_DIR, get_date_string
 from services.prompt_service import get_prompt as get_prompt_from_firestore
+from utils.openai_client import get_openai_client
+from utils.constants import (
+    STATUS_APPROVED,
+    STATUS_REJECTED,
+    OPENAI_MODEL_REVIEW,
+    OPENAI_MAX_TOKENS_REVIEW,
+    OPENAI_TEMPERATURE_REVIEW
+)
 
 load_dotenv()
-
-# OpenAI API 키 설정
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -50,6 +54,37 @@ def load_eap_review_prompt() -> str:
 다음 공고가 EAP에 적합한지 검토해주세요.
 """
 
+# 제외 키워드 목록 (제목에 포함되면 자동으로 부적합 처리)
+EXCLUSION_KEYWORDS = [
+    '콜센터',
+    '차량 임차',
+    '차량임차',
+    '운행',
+    '통근버스',
+    '통근 버스',
+    '버스 운행',
+    '버스운행',
+    # '파견 용역', '파견용역'은 제외하지 않음 (필요한 공고가 있을 수 있음)
+]
+
+def should_exclude_by_keywords(announcement: Dict) -> tuple[bool, str]:
+    """
+    제외 키워드로 인한 자동 부적합 판단
+    
+    Args:
+        announcement: 공고 데이터 딕셔너리
+        
+    Returns:
+        (제외 여부, 제외 사유) 튜플
+    """
+    title = announcement.get('title', '').lower()
+    
+    for keyword in EXCLUSION_KEYWORDS:
+        if keyword.lower() in title:
+            return True, f"제외 키워드 포함: '{keyword}'"
+    
+    return False, ""
+
 def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
     """
     리포트 파일의 모든 공고를 ChatGPT API로 검수하고 리포트 파일을 업데이트
@@ -70,8 +105,10 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
     print(f"날짜: {report_date.strftime('%Y-%m-%d')}")
     
     # OpenAI API 키 확인
-    if not OPENAI_API_KEY:
-        error_msg = "⚠️  OPENAI_API_KEY가 설정되지 않았습니다. .env 파일에 OPENAI_API_KEY를 추가해주세요."
+    try:
+        get_openai_client()
+    except ValueError as e:
+        error_msg = f"⚠️  {str(e)}"
         print(error_msg)
         return {
             'success': False,
@@ -137,6 +174,19 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                         rejected_count += 1
                     continue
                 
+                # 제외 키워드 체크 (ChatGPT 검수 전에 먼저 필터링)
+                exclude, exclude_reason = should_exclude_by_keywords(announcement)
+                if exclude:
+                    print(f"   [{idx}/{len(report_data)}] 🚫 제외 키워드: {announcement_number[:20]}... ({exclude_reason})")
+                    announcement['reviewed'] = True
+                    announcement['review_result'] = f"- 적합 여부: 부적합\n- 이유: {exclude_reason}"
+                    announcement['review_model'] = 'keyword-filter'
+                    announcement['reviewed_at'] = datetime.now().isoformat()
+                    announcement['status'] = STATUS_REJECTED
+                    rejected_count += 1
+                    reviewed_count += 1
+                    continue
+                
                 # ChatGPT API로 검수
                 review_result = review_announcement_with_chatgpt(announcement)
                 
@@ -147,10 +197,10 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 announcement['reviewed_at'] = datetime.now().isoformat()
                 
                 if review_result.get('approved', False):
-                    announcement['status'] = 'approved'
+                    announcement['status'] = STATUS_APPROVED
                     approved_count += 1
                 else:
-                    announcement['status'] = 'rejected'
+                    announcement['status'] = STATUS_REJECTED
                     rejected_count += 1
                 
                 reviewed_count += 1
