@@ -12,7 +12,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from services.firebase_service import get_db
-REPORT_DIR = BASE_DIR / "competitor_reports"
+# 프로젝트 루트의 competitor_reports 폴더 사용
+PROJECT_ROOT = BASE_DIR.parent if BASE_DIR.name == 'backend' else BASE_DIR
+REPORT_DIR = PROJECT_ROOT / "competitor_reports"
 
 
 def upload_competitor_reports():
@@ -39,6 +41,11 @@ def upload_competitor_reports():
         # 배열 형태인 경우
         if isinstance(data, list):
             items = data
+        # 객체 형태인 경우 (period, items 필드 포함)
+        elif isinstance(data, dict) and 'items' in data:
+            items = data['items']
+            if 'period' in data:
+                print(f"   기간: {data['period'].get('start', '')} ~ {data['period'].get('end', '')}")
         else:
             print("   ⚠️  지원하지 않는 파일 형식입니다.")
             continue
