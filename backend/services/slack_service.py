@@ -156,25 +156,39 @@ def send_report_to_slack(
         })
         
         # 5. 적합 공고 목록 (최대 5개)
-        # 실제로 EAP와 관련이 있는 공고만 필터링 (제목에 "근로자지원프로그램" 또는 "EAP" 포함)
+        # 모든 적합 공고 표시 (EAP 관련 키워드 필터링 제거)
         all_approved = [a for a in announcements if a.get('status') == 'approved']
-        approved_announcements = []
-        for ann in all_approved:
-            title = ann.get('title', '')
-            # 실제로 EAP와 관련이 있는 공고만 포함
-            if '근로자지원프로그램' in title or 'EAP' in title or 'employee assistance program' in title.lower():
-                approved_announcements.append(ann)
-        
-        approved_announcements = approved_announcements[:5]  # 최대 5개
+        approved_announcements = all_approved[:5]  # 최대 5개
         
         if approved_announcements:
+            # 프론트엔드 URL 가져오기
+            frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.41:3000')
+            
+            # Firestore에서 문서 ID 조회를 위해 Firebase 서비스 import
+            try:
+                from services.firebase_service import get_announcement_by_number
+            except ImportError:
+                get_announcement_by_number = None
+            
             approved_text = ":white_check_mark: *적합 공고 (최대 5개)*\n"
             for i, ann in enumerate(approved_announcements, 1):
                 title = ann.get('title', '제목 없음')
-                agency = ann.get('agency', '-')
-                budget = ann.get('budget_amount', 0)
-                budget_str = f"{budget:,}원" if budget else "-"
-                approved_text += f"{i}. *{title}*\n   기관: {agency} | 예산: {budget_str}\n"
+                announcement_number = ann.get('announcement_number', '')
+                
+                # Firestore에서 문서 ID 조회하여 상세페이지 링크 생성
+                detail_link = None
+                if announcement_number and get_announcement_by_number:
+                    doc_id, _ = get_announcement_by_number(announcement_number)
+                    if doc_id:
+                        detail_link = f"{frontend_url}/announcements/{doc_id}"
+                
+                # 링크가 있으면 공고명에 하이퍼링크 추가, 없으면 일반 텍스트
+                if detail_link:
+                    title_with_link = f"<{detail_link}|{title}>"
+                else:
+                    title_with_link = title
+                
+                approved_text += f"{i}. *{title_with_link}*\n"
             
             blocks.append({
                 "type": "section",
