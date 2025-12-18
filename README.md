@@ -36,7 +36,17 @@ eap_intern_roni/
 
 ## 빠른 시작
 
-자세한 설치 가이드는 [SETUP.md](./SETUP.md)를 참고하세요.
+### 🚀 처음 시작하시나요?
+
+1. **[QUICK_START.md](./QUICK_START.md)** - 프로젝트 클론부터 첫 리포트 생성까지 (5분 가이드)
+2. **[ENV_SETUP.md](./ENV_SETUP.md)** - 환경 변수 설정 가이드
+3. **[WORKFLOW_GUIDE.md](./WORKFLOW_GUIDE.md)** - 일일 리포트 생성 상세 워크플로우
+4. **[DAILY_CHECKLIST.md](./DAILY_CHECKLIST.md)** - 매일 사용하는 체크리스트
+
+### 📚 상세 문서
+
+- [SETUP.md](./SETUP.md) - 상세 설치 가이드
+- [backend/scripts/README.md](./backend/scripts/README.md) - 스크립트 사용법
 
 ### 백엔드 설정
 ```bash

@@ -162,7 +162,8 @@ def send_report_to_slack(
         
         if approved_announcements:
             # 프론트엔드 URL 가져오기
-            frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.41:3000')
+            # 기본값: 로컬/내부망에서 접근 가능한 주소 (사용자가 지정한 기본 랜딩 URL)
+            frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.17:3000')
             
             # Firestore에서 문서 ID 조회를 위해 Firebase 서비스 import
             try:
@@ -199,7 +200,8 @@ def send_report_to_slack(
             })
         
         # 6. 전체 리포트 링크 (프론트엔드 URL)
-        frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.41:3000')
+        # 슬랙 메시지에서 "프론트엔드에서 보기" 링크가 랜딩될 기본 주소
+        frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.17:3000')
         blocks.append({
             "type": "section",
             "text": {

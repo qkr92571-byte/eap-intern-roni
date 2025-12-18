@@ -24,14 +24,15 @@ import {
   Sort,
 } from '@mui/icons-material';
 import { useAnnouncements } from '../hooks/useAnnouncements';
+import { Announcement } from '../types';
 import { formatBudget, formatDateShort } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 100 });
   const [searchTerm, setSearchTerm] = useState('');
-  const [reviewFilter, setReviewFilter] = useState<string>('all'); // 검수 결과 필터
-  const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('created_at');
+  const [reviewFilter, setReviewFilter] = useState<string>('approved'); // 검수 결과 필터
+  const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
 
@@ -139,10 +140,8 @@ const AnnouncementList: React.FC = () => {
         onChange={(e, newValue) => setReviewFilter(newValue)}
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tab label={`전체 (${reviewCounts.all})`} value="all" />
         <Tab label={`적합 (${reviewCounts.approved})`} value="approved" />
         <Tab label={`부적합 (${reviewCounts.rejected})`} value="rejected" />
-        <Tab label={`미검수 (${reviewCounts.pending})`} value="pending" />
       </Tabs>
 
       {/* 테이블 뷰 */}
@@ -166,7 +165,7 @@ const AnnouncementList: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                   <Typography color="textSecondary">
-                    {searchTerm || reviewFilter !== 'all'
+                    {searchTerm || reviewFilter
                       ? '검색 조건에 맞는 공고가 없습니다.' 
                       : '공고가 없습니다.'}
                   </Typography>
