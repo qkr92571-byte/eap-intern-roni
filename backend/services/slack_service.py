@@ -142,10 +142,9 @@ def send_report_to_slack(
         
         # 4. 통계 정보
         stats_text = f":clipboard: *신규 공고*\n총 {total_count}개"
-        if approved_count > 0 or rejected_count > 0 or pending_count > 0:
+        if approved_count > 0 or rejected_count > 0:
             stats_text += f"\n  • 적합: {approved_count}개"
             stats_text += f"\n  • 부적합: {rejected_count}개"
-            stats_text += f"\n  • 미검수: {pending_count}개"
         
         blocks.append({
             "type": "section",
