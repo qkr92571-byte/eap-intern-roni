@@ -39,10 +39,70 @@
 - **컨펌 없이는 전송 금지**: 채널/본문/링크/멘션/통계를 포함한 초안을 사용자에게 제시하고 명시적 승인(“네/승인”)을 받은 뒤에만 전송합니다.
 - **공식 채널 고정**: 승인된 메시지는 공식 채널 `C034EQD6W4W`로만 전송합니다. 테스트 채널은 별도 지시가 있을 때만 사용합니다.
 - **전송 경로 고정**: 슬랙 전송은 `services/slack_service.py`의 `send_report_to_slack`/`send_daily_report_to_slack`만 사용합니다. 임의로 `chat_postMessage`를 직접 호출하거나 텍스트-only 메시지를 보내지 않습니다.
-- **템플릿 준수**: 블록 메시지 템플릿(이모지/섹션/멘션/링크 포함)을 그대로 사용합니다. 프론트엔드 링크는 `FRONTEND_URL`(기본 `http://172.30.1.41:3000`)을 사용합니다.
+- **템플릿 준수**: 블록 메시지 템플릿(이모지/섹션/멘션/링크 포함)을 그대로 사용합니다.
+  - 적합 공고 리스트: **나라장터 상세 페이지 링크로 직접 이동**하도록 구성합니다. (예: `https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=...&bidPbancOrd=...`)
+  - 전체 리포트 링크: 프론트엔드 랜딩 주소 `FRONTEND_URL`(기본 `http://172.30.1.17:3000`)을 사용합니다.
 - **유저그룹 멘션 강제**: EAP 파트 멘션을 `<@subteam>` 형식으로 포함합니다. `SLACK_EAP_USERGROUP` 환경변수(기본 `S08SE5ZTPQD`)를 사용합니다.
 - **집계 기준**: 적합/부적합/미검수 카운트는 상태 값 기준으로 집계합니다(키워드 필터로 누락 금지).
 - **전송 후 보고**: 전송 성공 시 채널/타임스탬프를 보고하고, 실패 시 에러와 조치 방안을 보고합니다.
+
+### 4-2. 운영 워크플로우 규칙 (다른 환경에서도 “오늘자 리포트 생성”이 그대로 동작하도록)
+
+#### A) "오늘" 정의
+- **"오늘" = KST(한국 표준시) 기준 당일 (자정 00:00:00 ~ 23:59:59)**
+- 코드에서는 `datetime.now(timezone(timedelta(hours=9)))` 또는 동일 의미의 KST 사용
+- 타임존이 명시되지 않은 경우 KST로 간주
+
+#### B) 단일 진입점 (권장)
+- **일일 리포트 생성**: `python -m backend.entrypoints.daily_report [옵션]`
+  - `--date YYYY-MM-DD`: 특정 날짜 리포트 생성 (기본값: 오늘 KST)
+  - `--skip-review`: 검수 단계 건너뛰기
+  - `--skip-service-items`: 서비스 항목 수집 건너뛰기
+  - `--skip-slack`: 슬랙 전송 건너뛰기
+  - `--auto`: 자동 모드 (컨펌 없이 실행, 스케줄/CI용)
+- 예시: `python -m backend.entrypoints.daily_report --date 2026-02-03`
+
+#### C) 사용자 요청 문구 해석(기본 자동화 범위)
+- 사용자가 **“오늘자 리포트 생성해줘”** 라고 요청하면, 아래를 **기본 프로세스**로 수행합니다.
+  - **(1) 오늘 날짜 확인 → 리포트 파일 존재 여부 확인**
+  - **(2) 리포트가 없으면 스크래핑으로 생성**
+  - **(3) GPT 검수(적합/부적합) 수행**
+  - **(4) Firestore 업로드(Upsert) 수행**
+  - **(5) Slack 전송은 하지 않음** (별도 “보내줘/전송해줘” 승인 필요)
+
+> 주의: Firestore 업로드는 “삭제 없음(Upsert)”만 허용합니다. 삭제/대량삭제/컬렉션 삭제는 어떤 경우에도 금지입니다.
+
+#### B) 표준 실행 스크립트(고정)
+- **리포트 생성(스크래핑)**: `backend/scripts/test_scraper.py`
+- **GPT 검수 + Firestore 업로드(Upsert, 삭제 없음, Slack 없음)**: `backend/scripts/review_and_upsert_firestore.py`
+- **Slack 전송(승인 받은 뒤에만)**: `backend/services/slack_service.py`의 `send_report_to_slack`
+
+#### C) 실행 순서(권장)
+- **항상 아래 순서를 유지**: 스크래핑 → GPT 검수 → Firestore Upsert → (초안) → (승인 후) Slack 전송
+
+#### D) 리포트 파일 형식 주의
+- 슬랙 전송 시 중복 방지를 위해 리포트 파일이 `{'announcements': [...], 'slack_sent': ...}` 형태로 저장될 수 있습니다.
+- 이후 작업(검수/업로드/집계)에서는 **리포트가 list인지 dict인지 모두 고려**해야 합니다.
+
+#### E) 다른 환경(새 PC/새 세션)에서의 필수 체크리스트
+- **백엔드 의존성 설치**:
+  - `pip install -r backend/requirements.txt`
+  - Playwright 설치/브라우저 설치가 필요할 수 있음 (`backend/install_playwright.sh` 참고)
+- **환경변수 설정**: `backend/.env` 필수
+  - `FIREBASE_CREDENTIALS_PATH`
+  - `OPENAI_API_KEY`
+  - `SLACK_BOT_TOKEN` (Slack 전송 시)
+  - `SLACK_CHANNEL_ID` (공식 채널: `C034EQD6W4W`)
+  - `SLACK_EAP_USERGROUP` (기본 `S08SE5ZTPQD`)
+  - `FRONTEND_URL` (기본 `http://172.30.1.17:3000`)
+- **프론트 실행(필요 시)**:
+  - 포트는 반드시 3000
+  - 접속 이슈(EMFILE 등) 발생 시 polling 옵션 사용:
+    - `HOST=0.0.0.0 PORT=3000 CHOKIDAR_USEPOLLING=true WATCHPACK_POLLING=true npm start`
+
+#### F) Cursor 실행 환경(권한/제약) 팁
+- Playwright(스크래핑), Firestore, Slack 전송은 환경에 따라 네트워크/권한 제약이 있을 수 있습니다.
+- 실행이 실패하면 “네트워크/샌드박스 권한 문제” 가능성이 높으므로, 필요한 경우 더 높은 권한으로 재시도합니다.
 
 ## 코드 스타일 및 구조
 

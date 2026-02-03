@@ -9,7 +9,8 @@ from services.keyword_service import get_keywords
 from services.file_service import (
     save_report,
     save_history,
-    get_history_numbers
+    get_history_numbers,
+    save_duplicate_report,
 )
 from models.announcement_schema import AnnouncementSchema
 
@@ -42,8 +43,12 @@ def run_scraper(keywords=None, request_date=None):
     print(f"  히스토리에서 {len(history_numbers)}개의 공고번호 발견")
     
     results = []
+    # 신규 공고 개수 (히스토리 기준)
     total_saved = 0
+    # 중복 공고 개수 (히스토리 기준)
     total_duplicates = 0
+    # 중복으로 판정된 공고 상세 리스트 (중복-only 상황에서 별도 리포트로 저장)
+    duplicate_announcements = []
     
     # 브라우저 실행 및 스크래핑
     with sync_playwright() as p:
@@ -274,7 +279,9 @@ def run_scraper(keywords=None, request_date=None):
                         
                         if announcement_number and announcement_number.strip():
                             if announcement_number.strip() in history_numbers:
+                                # 과거 히스토리에 이미 존재하는 공고 → 중복으로 처리
                                 keyword_duplicates += 1
+                                duplicate_announcements.append(announcement)
                                 continue
                         
                         results.append(announcement)
@@ -330,6 +337,7 @@ def run_scraper(keywords=None, request_date=None):
     
     # 파일로 저장 (필터링된 결과만)
     if filtered_results:
+        # 신규 공고가 하나라도 있는 경우: 기존 로직대로 report/history 저장
         try:
             report_path = save_report(filtered_results, request_date)
             print(f"  Report 파일 저장: {report_path}")
@@ -340,6 +348,21 @@ def run_scraper(keywords=None, request_date=None):
             print(f"  파일 저장 중 오류: {str(e)}")
             import traceback
             print(traceback.format_exc())
+    else:
+        # 신규 공고는 없지만, 중복 공고는 존재하는 경우
+        # → backend/duplicate_reports/ 하위에 중복 리포트 JSON 저장
+        if duplicate_announcements:
+            try:
+                duplicate_report_path = save_duplicate_report(
+                    duplicates=duplicate_announcements,
+                    date=request_date,
+                    total_duplicates=total_duplicates,
+                )
+                print(f"  Duplicate Report 파일 저장: {duplicate_report_path}")
+            except Exception as e:
+                print(f"  Duplicate Report 파일 저장 중 오류: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
     return filtered_results
 
 def search_by_keyword(page, keyword, request_date=None, is_first_keyword=False):
@@ -578,6 +601,11 @@ def scrape_announcements_from_page(page, request_date=None):
     """
     if request_date is None:
         request_date = datetime.now()
+    
+    # Orchestrator에서 KST timezone-aware datetime을 넘길 수 있으므로,
+    # 비교 연산을 위해 tz 정보를 제거한 naive datetime으로 통일한다.
+    if getattr(request_date, "tzinfo", None) is not None:
+        request_date = request_date.replace(tzinfo=None)
     
     announcements = []
     

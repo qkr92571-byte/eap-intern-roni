@@ -1,19 +1,77 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def _load_env_for_backend():
+    """
+    backend/.env 또는 프로젝트 루트 .env를 우선적으로 로드
+    
+    - FIREBASE_CREDENTIALS_PATH 등 백엔드 설정이 backend/.env에 있는 경우
+      현재 작업 디렉토리와 상관없이 항상 로드되도록 보장
+    """
+    backend_dir = Path(__file__).resolve().parent.parent  # .../backend
+    project_root = backend_dir.parent                     # .../ (프로젝트 루트)
+    
+    backend_env = backend_dir / ".env"
+    root_env = project_root / ".env"
+    
+    if backend_env.exists():
+        load_dotenv(backend_env)
+    elif root_env.exists():
+        load_dotenv(root_env)
+    else:
+        load_dotenv()
+
+
+_load_env_for_backend()
 
 _db = None
+
+
+def _resolve_credential_path(raw_path: str) -> str:
+    """
+    Firebase 서비스 계정 키 파일 경로를 backend 디렉토리 기준으로 안전하게 해석
+    
+    우선순위:
+    1. 절대 경로라면 그대로 사용 (존재 여부만 체크)
+    2. 상대 경로라면 backend/ 기준으로 조합
+    3. 그래도 없으면 프로젝트 루트 기준으로 한 번 더 시도
+    """
+    if not raw_path:
+        return raw_path
+    
+    # 절대 경로면 그대로 반환
+    if os.path.isabs(raw_path):
+        return raw_path
+    
+    backend_dir = Path(__file__).resolve().parent.parent
+    project_root = backend_dir.parent
+    
+    # 1차 시도: backend/ 기준 상대 경로
+    candidate_backend = backend_dir / raw_path
+    if candidate_backend.exists():
+        return str(candidate_backend)
+    
+    # 2차 시도: 프로젝트 루트 기준 상대 경로
+    candidate_root = project_root / raw_path
+    if candidate_root.exists():
+        return str(candidate_root)
+    
+    # 둘 다 없으면 원본 경로 그대로 반환 (에러 메시지에 노출하기 위함)
+    return raw_path
+
 
 def init_firebase():
     """Firebase 초기화"""
     global _db
     
     if not firebase_admin._apps:
-        # Firebase 서비스 계정 키 파일 경로
-        cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH', 'config/firebase-credentials.json')
+        # Firebase 서비스 계정 키 파일 경로 (기본값은 backend 기준 config/firebase-credentials.json)
+        raw_cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH', 'config/firebase-credentials.json')
+        cred_path = _resolve_credential_path(raw_cred_path)
         
         if os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)

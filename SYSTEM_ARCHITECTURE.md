@@ -2,12 +2,13 @@
 
 ## 📋 목차
 1. [시스템 개요](#시스템-개요)
-2. [환경 구성](#환경-구성)
-3. [파일 구조](#파일-구조)
-4. [작동 프로세스](#작동-프로세스)
-5. [Playwright 검색 로직 상세](#playwright-검색-로직-상세)
-6. [의존성 및 환경변수](#의존성-및-환경변수)
-7. [문제 해결 가이드](#문제-해결-가이드)
+2. [아키텍처 개요](#아키텍처-개요)
+3. [환경 구성](#환경-구성)
+4. [파일 구조](#파일-구조)
+5. [작동 프로세스](#작동-프로세스)
+6. [Playwright 검색 로직 상세](#playwright-검색-로직-상세)
+7. [의존성 및 환경변수](#의존성-및-환경변수)
+8. [문제 해결 가이드](#문제-해결-가이드)
 
 ---
 
@@ -18,9 +19,97 @@
 ### 주요 기능
 - **웹 크롤링**: Playwright를 사용한 브라우저 자동화
 - **데이터 필터링**: 중복 제거, 키워드 필터링, 업무구분 필터링
-- **리포트 생성**: Markdown 형식의 리포트 자동 생성
-- **Notion 업로드**: 생성된 리포트를 Notion 데이터베이스에 자동 업로드
+- **AI 검수**: ChatGPT API를 통한 적합/부적합 자동 판정
+- **Firestore 저장**: Firebase Firestore에 공고 데이터 저장 및 관리
 - **Slack 알림**: 리포트 요약을 Slack 채널로 전송
+
+---
+
+## 아키텍처 개요
+
+### Multi-Agent Skill 아키텍처
+
+시스템은 **Multi-Agent Skill 중심 아키텍처**로 설계되어 있습니다.
+
+#### 핵심 개념
+
+1. **Skill (스킬)**: 재사용 가능한 단일 책임 단위
+   - 명확한 입력/출력 계약
+   - 부수 효과(파일 쓰기, DB, 슬랙) 명시
+   - 다른 에이전트나 오케스트레이터에서 공통 호출 가능
+
+2. **Agent (에이전트)**: 특정 역할을 담당하는 에이전트
+   - 해당 역할에 필요한 스킬을 소유·호출
+   - 필요 시 다른 에이전트에 위임
+
+3. **Orchestrator (오케스트레이터)**: 워크플로우 관리
+   - 사용자 의도를 해석하여 에이전트 호출 순서 결정
+   - 컨펌 정책 관리 (interactive vs auto)
+
+#### 아키텍처 다이어그램
+
+```
+┌─────────────────────────────────────────┐
+│         Orchestrator                    │
+│  (워크플로우 관리 및 컨펌 정책)          │
+└──────────────┬──────────────────────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+    ▼          ▼          ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│Collector│ │Reviewer│ │Reporter│ │Notifier│
+│ Agent  │ │ Agent  │ │ Agent  │ │ Agent  │
+└────┬───┘ └────┬───┘ └────┬───┘ └────┬───┘
+     │          │          │          │
+     ▼          ▼          ▼          ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│skill_  │ │skill_  │ │skill_  │ │skill_  │
+│scrape_ │ │review_ │ │upsert_ │ │send_   │
+│g2b     │ │announc │ │firestor│ │slack_  │
+│        │ │ements  │ │e       │ │report  │
+└────────┘ └────────┘ └────────┘ └────────┘
+```
+
+#### 에이전트 역할
+
+| 에이전트 | 역할 | 보유 스킬 |
+|---------|------|----------|
+| **CollectorAgent** | 공고 수집 | `skill_scrape_g2b` |
+| **ReviewerAgent** | 적합/부적합 검수 | `skill_review_announcements` |
+| **ReporterAgent** | Firestore 반영·서비스 항목 | `skill_upsert_firestore`, `skill_collect_service_items` |
+| **NotifierAgent** | 슬랙 알림 | `skill_send_slack_report` |
+
+#### 단일 진입점
+
+**일일 리포트 생성**:
+```bash
+python -m backend.entrypoints.daily_report [옵션]
+```
+
+**옵션**:
+- `--date YYYY-MM-DD`: 특정 날짜 리포트 생성 (기본값: 오늘 KST)
+- `--skip-review`: 검수 단계 건너뛰기
+- `--skip-service-items`: 서비스 항목 수집 건너뛰기
+- `--skip-slack`: 슬랙 전송 건너뛰기
+- `--auto`: 자동 모드 (컨펌 없이 실행, 스케줄/CI용)
+
+**예시**:
+```bash
+# 오늘자 리포트 생성
+python -m backend.entrypoints.daily_report
+
+# 특정 날짜 리포트 생성
+python -m backend.entrypoints.daily_report --date 2026-02-03
+
+# 자동 모드 (컨펌 없이 실행)
+python -m backend.entrypoints.daily_report --auto
+```
+
+#### 컨펌 정책
+
+- **interactive (기본값)**: DB 쓰기·슬랙 전송 전에 사용자에게 확인
+- **auto**: `--auto` 플래그 또는 `AUTO_CONFIRM=1` 환경변수 설정 시 자동 실행
 
 ---
 
@@ -86,17 +175,42 @@ PLAYWRIGHT_HEADLESS=false  # true: 브라우저 숨김, false: 브라우저 표�
 ## 파일 구조
 
 ```
-naramarket-mcp-slack/
-├── .env                          # 환경변수 파일 (생성 필요)
-├── test/
-│   ├── g2b_full_search_and_extract.py  # 메인 스크립트
-│   ├── send_to_slack.py                # Slack 전송 모듈
-│   └── upload_to_notion.py             # Notion 업로드 모듈
-├── test_report/                  # 생성된 리포트 저장 폴더
-│   └── bid_report_YYYYMMDD.md
-├── history/                      # 히스토리 파일 저장 폴더
-│   └── shared_YYYYMMDD.json
-└── SYSTEM_ARCHITECTURE.md        # 이 문서
+backend/
+├── skills/                       # 스킬 모듈 (재사용 가능한 단일 책임 단위)
+│   ├── __init__.py
+│   ├── scrape.py               # skill_scrape_g2b
+│   ├── review.py                # skill_review_announcements
+│   ├── firestore.py             # skill_upsert_firestore
+│   ├── slack.py                 # skill_send_slack_report
+│   └── service_items.py         # skill_collect_service_items
+├── agents/                       # 에이전트 모듈
+│   ├── collector_agent.py      # CollectorAgent
+│   ├── reviewer_agent.py       # ReviewerAgent
+│   ├── reporter_agent.py       # ReporterAgent
+│   ├── notifier_agent.py       # NotifierAgent
+│   ├── code_review_agent.py    # CodeReviewAgent (코드 품질)
+│   └── code_optimizer_agent.py # CodeOptimizerAgent (코드 품질)
+├── orchestration/                # 오케스트레이터 모듈
+│   ├── __init__.py
+│   ├── orchestrator.py          # 워크플로우 관리
+│   └── policies.py             # 컨펌 정책 관리
+├── entrypoints/                  # 단일 진입점
+│   ├── __init__.py
+│   └── daily_report.py         # 일일 리포트 생성 진입점
+├── services/                     # 서비스 레이어 (기존 유지)
+│   ├── scraper_service.py
+│   ├── review_service.py
+│   ├── firebase_service.py
+│   ├── slack_service.py
+│   └── ...
+├── scripts/                      # 스크립트 (하위 호환용)
+│   ├── test_scraper.py
+│   ├── review_and_upsert_firestore.py
+│   └── ...
+├── report/                       # 리포트 파일 저장 폴더
+│   └── report_YYMMDD.json
+└── history/                      # 히스토리 파일 저장 폴더
+    └── history_YYMMDD.json
 ```
 
 ---

@@ -6,11 +6,40 @@ OpenAI 클라이언트 공통 유틸리티
 
 import os
 from typing import Optional
+from pathlib import Path
 from dotenv import load_dotenv
 import openai
 import httpx
 
-load_dotenv()
+
+def _load_env_for_backend():
+    """
+    backend/.env 또는 프로젝트 루트 .env를 우선적으로 로드
+    
+    - daily_report 엔트리포인트는 보통 프로젝트 루트에서 실행되므로
+      현재 작업 디렉토리 기준 .env만 읽으면 backend/.env를 놓칠 수 있음
+    - 이 헬퍼는 다음 우선순위로 .env를 로드한다.
+      1) backend/.env
+      2) 프로젝트 루트(.env)
+      3) 기본 load_dotenv() (마지막 안전장치)
+    """
+    # 현재 파일 기준으로 backend 디렉토리 위치 계산
+    backend_dir = Path(__file__).resolve().parent.parent  # .../backend
+    project_root = backend_dir.parent                     # .../ (프로젝트 루트)
+    
+    backend_env = backend_dir / ".env"
+    root_env = project_root / ".env"
+    
+    if backend_env.exists():
+        load_dotenv(backend_env)
+    elif root_env.exists():
+        load_dotenv(root_env)
+    else:
+        # 그래도 없으면 기본 동작에 맡김
+        load_dotenv()
+
+
+_load_env_for_backend()
 
 # OpenAI API 키
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')

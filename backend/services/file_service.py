@@ -14,17 +14,27 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 REPORT_DIR = PROJECT_ROOT / 'report'
 HISTORY_DIR = PROJECT_ROOT / 'history'
+# 중복 리포트 저장 디렉토리 (오늘 수집분이 모두 과거 공고인 경우 이력용)
+DUPLICATE_REPORT_DIR = PROJECT_ROOT / 'duplicate_reports'
 
 def ensure_directories():
     """필요한 디렉토리 생성"""
     REPORT_DIR.mkdir(exist_ok=True)
     HISTORY_DIR.mkdir(exist_ok=True)
+    DUPLICATE_REPORT_DIR.mkdir(exist_ok=True)
 
 def get_date_string(date=None):
     """날짜 문자열 생성 (YYMMDD 형식)"""
     if date is None:
         date = datetime.now()
     return date.strftime('%y%m%d')
+
+
+def _get_iso_date_string(date=None) -> str:
+    """ISO 8601 형식(YYYY-MM-DD)의 날짜 문자열 생성"""
+    if date is None:
+        date = datetime.now()
+    return date.strftime('%Y-%m-%d')
 
 def save_report(announcements: List[Dict], date=None) -> str:
     """
@@ -64,6 +74,52 @@ def save_report(announcements: List[Dict], date=None) -> str:
     # 파일 저장
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(merged_data, f, ensure_ascii=False, indent=2)
+    
+    return str(filepath)
+
+
+def save_duplicate_report(
+    duplicates: List[Dict],
+    date=None,
+    total_duplicates: int | None = None
+) -> str:
+    """
+    중복 공고만 존재하는 경우, 중복 이력을 별도 파일로 저장
+    
+    - 오늘 수집한 공고 중 모두 과거에 이미 수집된 경우(신규 없음)에 사용
+    - 중복 공고의 상세 정보를 그대로 남겨, 나중에 어떤 공고들이 중복이었는지 확인 가능
+    
+    Args:
+        duplicates: 히스토리 기준 중복으로 판정된 공고 리스트
+        date: 기준 날짜 (기본값: 오늘)
+        total_duplicates: 전체 중복 개수(선택, 없으면 len(duplicates) 사용)
+    
+    Returns:
+        저장된 파일 경로
+    """
+    ensure_directories()
+    
+    if not duplicates:
+        # 저장할 데이터가 없으면 바로 반환
+        date_str = get_date_string(date)
+        filename = f'duplicate_report_{date_str}.json'
+        filepath = DUPLICATE_REPORT_DIR / filename
+        return str(filepath)
+    
+    date_str_compact = get_date_string(date)
+    iso_date = _get_iso_date_string(date)
+    filename = f'duplicate_report_{date_str_compact}.json'
+    filepath = DUPLICATE_REPORT_DIR / filename
+    
+    payload = {
+        "date": iso_date,
+        "generated_at": datetime.now().isoformat(),
+        "total_duplicates": int(total_duplicates) if total_duplicates is not None else len(duplicates),
+        "announcements": duplicates,
+    }
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
     
     return str(filepath)
 
