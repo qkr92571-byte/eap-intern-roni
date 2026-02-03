@@ -10,5 +10,10 @@ pdfplumber==0.11.8
 slack-sdk==3.27.1
 certifi==2024.2.2
 pyhwp==0.1b12
+# 코드 분석 및 최적화 에이전트용
+pylint==3.0.3
+flake8==7.0.0
+radon==6.0.1
+bandit==1.7.5
 
 

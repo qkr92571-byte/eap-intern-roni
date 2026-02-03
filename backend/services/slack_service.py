@@ -6,6 +6,7 @@ import os
 import json
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
@@ -22,6 +23,30 @@ except ImportError:
     HAS_SLACK_SDK = False
     print("⚠️  slack_sdk가 설치되지 않았습니다.")
     print("   설치: pip install slack-sdk certifi")
+
+
+def _build_g2b_detail_url(announcement_number: str) -> Optional[str]:
+    """
+    나라장터(차세대) 상세 페이지 URL 생성
+
+    예)
+    - announcement_number: R26BK01313635-000
+    - URL: https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=R26BK01313635&bidPbancOrd=000
+
+    공고번호가 위 형태로 파싱되지 않으면 None 반환.
+    """
+    ann = (announcement_number or "").strip()
+    if not ann:
+        return None
+
+    # 일반적으로 나라장터 공고번호는 "<bidPbancNo>-<bidPbancOrd>" 형태
+    m = re.match(r"^(?P<no>[^-]+)-(?P<ord>\d+)$", ann)
+    if not m:
+        return None
+
+    bid_no = m.group("no")
+    bid_ord = m.group("ord")
+    return f"https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo={bid_no}&bidPbancOrd={bid_ord}"
 
 
 def send_report_to_slack(
@@ -154,49 +179,59 @@ def send_report_to_slack(
             }
         })
         
-        # 5. 적합 공고 목록 (최대 5개)
-        # 모든 적합 공고 표시 (EAP 관련 키워드 필터링 제거)
+        # 5. 적합 공고 목록 (전체 표시)
         all_approved = [a for a in announcements if a.get('status') == 'approved']
-        approved_announcements = all_approved[:5]  # 최대 5개
         
-        if approved_announcements:
-            # 프론트엔드 URL 가져오기
-            # 기본값: 로컬/내부망에서 접근 가능한 주소 (사용자가 지정한 기본 랜딩 URL)
-            frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.17:3000')
-            
-            # Firestore에서 문서 ID 조회를 위해 Firebase 서비스 import
-            try:
-                from services.firebase_service import get_announcement_by_number
-            except ImportError:
-                get_announcement_by_number = None
-            
-            approved_text = ":white_check_mark: *적합 공고 (최대 5개)*\n"
-            for i, ann in enumerate(approved_announcements, 1):
+        if all_approved:
+            # Slack mrkdwn 섹션 길이 제한(대략 3000자)을 피하기 위해, 여러 블록으로 나눠서 전송
+            approved_lines = []
+            for i, ann in enumerate(all_approved, 1):
                 title = ann.get('title', '제목 없음')
                 announcement_number = ann.get('announcement_number', '')
                 
-                # Firestore에서 문서 ID 조회하여 상세페이지 링크 생성
-                detail_link = None
-                if announcement_number and get_announcement_by_number:
-                    doc_id, _ = get_announcement_by_number(announcement_number)
-                    if doc_id:
-                        detail_link = f"{frontend_url}/announcements/{doc_id}"
-                
+                # 적합 공고 리스트는 나라장터 상세 페이지로 바로 이동하도록 링크 생성
+                # 예: https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=R26BK01313635&bidPbancOrd=000
+                g2b_link = _build_g2b_detail_url(announcement_number)
+
                 # 링크가 있으면 공고명에 하이퍼링크 추가, 없으면 일반 텍스트
-                if detail_link:
-                    title_with_link = f"<{detail_link}|{title}>"
+                if g2b_link:
+                    title_with_link = f"<{g2b_link}|{title}>"
                 else:
                     title_with_link = title
-                
-                approved_text += f"{i}. *{title_with_link}*\n"
-            
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": approved_text
-                }
-            })
+
+                approved_lines.append(f"{i}. *{title_with_link}*")
+
+            # 블록 분할(너무 길면 Slack 전송 실패)
+            max_section_chars = 2900
+            header_text = ":white_check_mark: *적합 공고*\n"
+            current = header_text
+
+            def _flush(text: str) -> None:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": text.rstrip()
+                    }
+                })
+
+            for line in approved_lines:
+                addition = f"{line}\n"
+                if len(current) + len(addition) > max_section_chars:
+                    _flush(current)
+                    # 이후 블록은 헤더를 짧게 유지
+                    current = ":white_check_mark: *적합 공고 (계속)*\n" + addition
+                else:
+                    current += addition
+
+                # Slack blocks는 최대 50개이므로, 과도한 분할로 실패하는 것을 방지
+                # (마지막 전체 리포트 링크 블록을 위해 최소 1개는 남겨둠)
+                if len(blocks) >= 49:
+                    current += "\n⚠️ 적합 공고가 많아 일부만 표시됩니다."
+                    break
+
+            if current.strip():
+                _flush(current)
         
         # 6. 전체 리포트 링크 (프론트엔드 URL)
         # 슬랙 메시지에서 "프론트엔드에서 보기" 링크가 랜딩될 기본 주소

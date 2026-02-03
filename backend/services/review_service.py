@@ -37,10 +37,11 @@ def load_eap_review_prompt() -> str:
     Returns:
         프롬프트 텍스트
     """
-    # 1. Firestore에서 프롬프트 조회 시도
-    firestore_prompt = get_prompt_from_firestore()
-    if firestore_prompt:
-        return firestore_prompt
+    # 1. Firestore에서 프롬프트 조회 시도 (네트워크 이슈/지연 시 스킵 가능)
+    if os.getenv("SKIP_FIRESTORE_PROMPT", "").strip().lower() not in ("1", "true", "yes"):
+        firestore_prompt = get_prompt_from_firestore()
+        if firestore_prompt:
+            return firestore_prompt
     
     # 2. 로컬 파일에서 로드 시도
     if EAP_REVIEW_PROMPT_PATH.exists():

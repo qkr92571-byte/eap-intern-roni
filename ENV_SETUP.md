@@ -122,6 +122,30 @@ NARA_API_KEY=your-nara-api-key-here
 
 ---
 
+### 코드 분석 및 최적화 에이전트 설정
+
+```env
+# 코드 분석 리포트 저장 디렉토리 (기본값: backend/code_analysis)
+CODE_ANALYSIS_OUTPUT_DIR=backend/code_analysis
+
+# 자동 수정 활성화 여부 (기본값: true)
+AUTO_FIX_ENABLED=true
+
+# 최적화용 AI 모델 (기본값: gpt-4o-mini)
+OPTIMIZATION_MODEL=gpt-4o-mini
+
+# 코드리뷰용 AI 모델 (기본값: gpt-4o-mini)
+REVIEW_MODEL=gpt-4o-mini
+```
+
+**설정 방법**:
+- `CODE_ANALYSIS_OUTPUT_DIR`: 분석 리포트가 저장될 디렉토리 경로
+- `AUTO_FIX_ENABLED`: 코드 최적화 에이전트가 안전한 변경사항을 자동으로 적용할지 여부
+- `OPTIMIZATION_MODEL`: 코드 최적화에 사용할 OpenAI 모델 (gpt-4o-mini, gpt-4 등)
+- `REVIEW_MODEL`: 코드리뷰에 사용할 OpenAI 모델 (gpt-4o-mini, gpt-4 등)
+
+---
+
 ## ✅ 환경 변수 확인
 
 설정이 완료되었는지 확인하려면:
