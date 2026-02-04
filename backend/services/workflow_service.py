@@ -1,7 +1,12 @@
 """
-워크플로우 서비스
-- 리포트 검수 및 업로드 프로세스를 단계별로 분리
-- 각 단계를 독립적인 서비스로 제공
+워크플로우 서비스 (레거시)
+
+⚠️ DEPRECATED:
+- 이 모듈은 멀티 에이전트 + Orchestrator 기반 워크플로우 도입 이전의 코드입니다.
+- 신규/운영 워크플로우 구현 시에는 `backend/entrypoints/daily_report.py`와
+  Orchestrator/Agents/Skills 구조를 사용하세요.
+- 이 모듈은 기존 스크립트(`scripts/review_and_upload_report.py`) 호환 및
+  디버깅 목적에서만 유지됩니다.
 """
 
 from datetime import datetime
@@ -15,6 +20,7 @@ from services.slack_service import send_report_to_slack
 from scripts.process_approved_announcements import process_approved_announcements
 from utils.constants import STATUS_APPROVED, STATUS_REJECTED, SLACK_PRODUCTION_CHANNEL_ID
 from utils.logger import StepLogger
+from orchestration.policies import request_confirmation
 
 
 class WorkflowService:
@@ -93,8 +99,7 @@ class WorkflowService:
         else:
             self.logger.warning("첨부파일 조사 및 서비스 항목 수집을 진행하시겠습니까?")
             self.logger.info("이 작업은 각 공고의 첨부파일을 다운로드하고 분석합니다.")
-            user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
-            process_service_items = user_input in ['yes', 'y']
+            process_service_items = request_confirmation("계속하려면 'yes' 또는 'y'를 입력하세요: ")
         
         if not process_service_items:
             self.logger.warning("사용자가 첨부파일 조사를 건너뛰었습니다.")
@@ -167,22 +172,19 @@ class WorkflowService:
         # 사용자 컨펌 요청
         if self.auto_upload:
             self.logger.success("자동 업로드 모드: Firestore 업로드를 진행합니다...")
-            user_input = 'yes'
         else:
             self.logger.warning("Firestore 업로드를 진행하시겠습니까?")
             self.logger.info("이 작업은 데이터베이스에 데이터를 저장합니다.")
-            user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
-        
-        if user_input not in ['yes', 'y']:
-            self.logger.warning("사용자가 업로드를 취소했습니다.")
-            self.logger.info("Firestore 업로드를 건너뜁니다.")
-            return {
-                'success': True,
-                'uploaded': 0,
-                'skipped': 0,
-                'failed': 0,
-                'message': '사용자가 취소했습니다.'
-            }
+            if not request_confirmation("계속하려면 'yes' 또는 'y'를 입력하세요: "):
+                self.logger.warning("사용자가 업로드를 취소했습니다.")
+                self.logger.info("Firestore 업로드를 건너뜁니다.")
+                return {
+                    'success': True,
+                    'uploaded': 0,
+                    'skipped': 0,
+                    'failed': 0,
+                    'message': '사용자가 취소했습니다.'
+                }
         
         self.logger.success("사용자 컨펌 확인됨. Firestore 업로드를 시작합니다...")
         
@@ -261,8 +263,7 @@ class WorkflowService:
         self.logger.info("이 작업은 공식 슬랙 채널에 리포트 메시지를 전송합니다.")
         
         if not self.auto_upload:
-            user_input = input("   계속하려면 'yes' 또는 'y'를 입력하세요: ").strip().lower()
-            if user_input not in ['yes', 'y']:
+            if not request_confirmation("계속하려면 'yes' 또는 'y'를 입력하세요: "):
                 self.logger.warning("사용자가 공식 채널 전송을 취소했습니다.")
                 return False
         

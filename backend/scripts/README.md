@@ -1,6 +1,24 @@
 # 스크립트 사용 가이드
 
-이 디렉토리에는 일회성 작업 및 테스트를 위한 스크립트들이 포함되어 있습니다.
+이 디렉토리는 **에이전트/Orchestrator 기반 워크플로우의 하위 레벨 스크립트와 유틸리티**를 모아둔 곳입니다.
+
+- **운영/일상 워크플로우의 표준 진입점**은 아래와 같습니다.
+  - `make daily`
+  - `python -m backend.entrypoints.daily_report --skip-slack --auto`
+- 아래 스크립트들은 주로 **개별 단계 디버깅, 테스트, 유틸리티 목적**으로 사용하는 것을 권장합니다.
+
+## 스크립트 분류
+
+- **운영/지원 유틸리티 (안전)**
+  - `test_firebase.py`, `test_db_insert.py`, `create_firestore_index.py`
+  - `test_api.py`, `collect_monthly_data.py`, `collect_competitor_awards.py`, `upload_competitor_reports.py`, `simplify_competitor_report.py`
+- **단계별 디버깅/수동 실행용 (주의)**
+  - `test_scraper.py`, `run_review_cycle.py`, `process_approved_announcements.py`
+  - `sync_firestore_with_report.py`, `upload_report_to_firestore.py`, `send_slack_report.py`
+- **레거시 워크플로우 (멀티 에이전트로 대체됨, 가급적 사용 지양)**
+  - `review_and_upload_report.py` (WorkflowService 기반 통합 스크립트)
+
+아래 개별 항목 설명에서 각 스크립트의 구체적인 역할과 주의사항을 확인할 수 있습니다.
 
 ## 스크립트 목록
 
@@ -35,39 +53,19 @@ python scripts/upload_report_to_firestore.py
 
 ---
 
-### 3. `review_and_upload_report.py` ⭐ **신규**
-리포트 파일 검수 및 Firestore 업로드 통합
+### 3. `review_and_upload_report.py` ⚠️ **레거시 (멀티 에이전트로 대체됨)**
+리포트 파일 검수 및 Firestore 업로드 통합 (이전 세대 워크플로우)
 
-**사용법:**
+> 현재는 `backend/entrypoints/daily_report.py` + Orchestrator/Agents 구조가 **공식 표준**입니다.  
+> 이 스크립트는 개별 단계 동작을 디버깅하거나, 과거 워크플로우를 재현해야 할 때만 사용하세요.
+
+**대체 경로(권장):**
 ```bash
 cd backend
-python scripts/review_and_upload_report.py
+
+# Orchestrator 기반 통합 실행
+python -m backend.entrypoints.daily_report --skip-slack --auto
 ```
-
-**기능:**
-1. 리포트 파일을 ChatGPT API로 검수
-2. 검수 결과를 리포트 파일에 반영 (status, review_result 등)
-3. 승인된 공고만 Firestore에 업로드
-
-**전체 프로세스:**
-```
-데이터 수집 (scraper_service.py)
-    ↓
-report_YYMMDD.json 생성
-    ↓
-ChatGPT API 검수 (review_service.py)
-    ↓
-리포트 파일 수정 (status, review_result 추가)
-    ↓
-Firestore 업로드 (승인된 공고만)
-```
-
-**환경 변수:**
-- `OPENAI_API_KEY`: OpenAI API 키 (필수)
-
-**주의사항:**
-- OpenAI API 사용 시 비용이 발생할 수 있습니다
-- 공고가 많을 경우 검수에 시간이 걸릴 수 있습니다
 
 ---
 
@@ -150,20 +148,23 @@ python scripts/create_firestore_index.py
 
 ---
 
-## 통합 워크플로우
+## 통합 워크플로우 (레거시 스크립트 기반)
 
-### 전체 프로세스 (수집 → 검수 → 업로드)
+> 참고용입니다. 실제 운영에서는 Orchestrator 기반 일일 리포트 진입점을 사용하세요.  
+> (예: `make daily`, `python -m backend.entrypoints.daily_report --skip-slack --auto`)
+
+### 전체 프로세스 (수집 → 검수 → 업로드, 레거시)
 
 ```bash
 # 1. 데이터 수집
 cd backend
 python scripts/test_scraper.py
 
-# 2. 검수 및 업로드 (통합)
+# 2. 검수 및 업로드 (통합, 레거시)
 python scripts/review_and_upload_report.py
 ```
 
-또는 API를 통해:
+또는 API를 통해 (레거시 엔드포인트 기준):
 
 ```bash
 # 1. 데이터 수집

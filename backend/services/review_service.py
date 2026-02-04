@@ -9,9 +9,9 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
-from dotenv import load_dotenv
 
 from services.file_service import load_report, REPORT_DIR, get_date_string
+from orchestration.policies import request_confirmation
 from services.prompt_service import get_prompt as get_prompt_from_firestore
 from utils.openai_client import get_openai_client
 from utils.constants import (
@@ -21,8 +21,6 @@ from utils.constants import (
     OPENAI_MAX_TOKENS_REVIEW,
     OPENAI_TEMPERATURE_REVIEW
 )
-
-load_dotenv()
 
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -142,8 +140,7 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
             print("\n⚠️  ChatGPT API 사용 시 비용이 발생합니다.")
             print(f"   검수할 공고 수: {len(report_data)}개")
             print(f"   예상 비용: 약 ${len(report_data) * 0.002:.2f} (gpt-3.5-turbo 기준)")
-            user_input = input("\n   검수를 진행하시겠습니까? (yes/no): ").strip().lower()
-            if user_input not in ('yes', 'y'):
+            if not request_confirmation("검수를 진행하시겠습니까? (yes/no): "):
                 print("   검수가 취소되었습니다.")
                 return {
                     'success': False,

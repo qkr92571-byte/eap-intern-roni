@@ -18,9 +18,49 @@
 
 ---
 
-## 🚀 빠른 시작 (전체 프로세스 한 번에 실행)
+## 🚀 빠른 시작 (권장 Orchestrator 방식)
 
-### 방법 1: 통합 스크립트 사용 (권장)
+### 방법 1: Orchestrator 기반 통합 실행 (가장 권장)
+
+멀티 에이전트 아키텍처 도입 이후, **일일 리포트 생성의 표준 진입점**은 아래 두 가지입니다.
+
+```bash
+cd /Users/hyeonsanglee/Documents/project/eap-intern-roni
+
+# 1) make를 통한 실행 (가장 간단)
+make daily
+
+# 2) 직접 엔트리포인트 실행
+python3 -m backend.entrypoints.daily_report --skip-slack --auto
+```
+
+**특징**
+- 수집 → 검수 → 서비스 항목 수집 → Firestore 업서트까지 **한 번에 자동 실행**
+- Orchestrator가 `CollectorAgent`, `ReviewerAgent`, `ReporterAgent`, `NotifierAgent`를 순서대로 호출
+- `--skip-slack` 옵션으로 기본적으로 슬랙 전송은 제외 (별도 승인 후 전송)
+- `--auto` 옵션으로 중간 컨펌 없이 자동 실행 (운영/스케줄러용)
+
+**옵션 예시**
+
+```bash
+# 오늘자(KST 기준) 리포트 생성 (슬랙 제외, 자동 모드)
+python3 -m backend.entrypoints.daily_report --skip-slack --auto
+
+# 특정 날짜 리포트 생성 (예: 2026-02-03)
+python3 -m backend.entrypoints.daily_report --date 2026-02-03 --skip-slack --auto
+
+# 검수만 건너뛰고 나머지 실행
+python3 -m backend.entrypoints.daily_report --skip-review --skip-slack --auto
+```
+
+---
+
+## 🚀 (레거시) 스크립트 기반 전체 프로세스 한 번에 실행
+
+> 아래 방법들은 **멀티 에이전트 도입 이전의 스크립트 기반 워크플로우**입니다.  
+> 현재는 **개별 단계 디버깅/수동 실행용**으로만 사용하는 것을 권장합니다.
+
+### 방법 2: 통합 스크립트 사용
 
 ```bash
 cd backend
@@ -41,12 +81,13 @@ python3 scripts/sync_firestore_with_report.py
 python3 scripts/send_slack_report.py 251217
 ```
 
-### 방법 2: WorkflowService 사용 (더 자동화)
+### 방법 3: WorkflowService 사용 (레거시, 멀티 에이전트로 대체됨)
 
 ```bash
 cd backend
 
 # 전체 워크플로우 자동 실행 (슬랙 전송 포함)
+# ⚠️ 레거시: 멀티 에이전트 Orchestrator(daily_report)로 대체되었습니다.
 python3 scripts/review_and_upload_report.py --skip-slack --auto-upload
 ```
 

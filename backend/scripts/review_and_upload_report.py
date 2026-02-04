@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-리포트 검수 및 Firestore 업로드 통합 스크립트
+리포트 검수 및 Firestore 업로드 통합 스크립트 (레거시)
 
+⚠️ DEPRECATED:
+- 이 스크립트는 멀티 에이전트 + Orchestrator 구조 도입 이전의 통합 워크플로우입니다.
+- 현재 공식 일일 리포트 생성 플로우는
+  `python -m backend.entrypoints.daily_report` (또는 `make daily`) 를 사용합니다.
+- 이 스크립트는 과거 워크플로우 재현 및 디버깅 목적에서만 사용하세요.
+
+동작 개요:
 1. 리포트 파일을 ChatGPT API로 검수
 2. 검수 결과를 리포트 파일에 반영
 3. 검수된 리포트를 Firestore에 업로드
 
-리팩토링: WorkflowService를 사용하여 단계별로 분리
+구현: WorkflowService를 사용하여 단계별로 분리
 """
 
 import sys

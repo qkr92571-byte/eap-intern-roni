@@ -78,9 +78,21 @@ def update_report_with_service_items(
         with open(report_path, 'r', encoding='utf-8') as f:
             report_data = json.load(f)
         
+        # 리포트가 딕셔너리 형태인 경우 (slack_sent 등 메타데이터 포함)
+        if isinstance(report_data, dict) and 'announcements' in report_data:
+            announcements = report_data['announcements']
+            is_dict_format = True
+        # 리포트가 리스트 형태인 경우 (기존 형식)
+        elif isinstance(report_data, list):
+            announcements = report_data
+            is_dict_format = False
+        else:
+            print(f"⚠️  리포트 파일 형식이 올바르지 않습니다.")
+            return False
+        
         # 해당 공고 찾아서 service_items 추가
         updated = False
-        for ann in report_data:
+        for ann in announcements:
             if ann.get('announcement_number') == announcement_number:
                 ann['service_items'] = service_items
                 ann['service_items_extracted_at'] = datetime.now().isoformat()
@@ -88,8 +100,15 @@ def update_report_with_service_items(
                 break
         
         if updated:
+            # 원래 형식 유지하여 저장
+            if is_dict_format:
+                report_data['announcements'] = announcements
+                output_data = report_data
+            else:
+                output_data = announcements
+            
             with open(report_path, 'w', encoding='utf-8') as f:
-                json.dump(report_data, f, ensure_ascii=False, indent=2)
+                json.dump(output_data, f, ensure_ascii=False, indent=2)
             print(f"✅ 리포트 파일 업데이트 완료: {report_path}")
             return True
         else:
@@ -161,12 +180,25 @@ def process_approved_announcements(report_date: Optional[datetime] = None) -> Di
         }
     
     # 리포트 파일 로드
-    report_data = load_report(report_date)
-    if not report_data:
+    raw_report = load_report(report_date)
+    if not raw_report:
         print("⚠️  처리할 데이터가 없습니다.")
         return {
             'success': False,
             'error': '처리할 데이터가 없습니다.',
+            'processed': 0
+        }
+    
+    # 리포트 포맷 정규화: dict(list 포함) / list 모두 지원
+    if isinstance(raw_report, dict) and 'announcements' in raw_report:
+        report_data = raw_report['announcements']
+    elif isinstance(raw_report, list):
+        report_data = raw_report
+    else:
+        print("⚠️  리포트 파일 형식이 올바르지 않습니다.")
+        return {
+            'success': False,
+            'error': '리포트 파일 형식이 올바르지 않습니다.',
             'processed': 0
         }
     

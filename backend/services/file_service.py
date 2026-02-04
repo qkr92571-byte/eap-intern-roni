@@ -224,7 +224,16 @@ def load_report(date=None) -> List[Dict]:
     
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            
+            # 리포트가 딕셔너리 형태인 경우 (slack_sent 등 메타데이터 포함)
+            if isinstance(data, dict) and 'announcements' in data:
+                return data['announcements']
+            # 리포트가 리스트 형태인 경우 (기존 형식)
+            elif isinstance(data, list):
+                return data
+            else:
+                return []
     except:
         return []
 
