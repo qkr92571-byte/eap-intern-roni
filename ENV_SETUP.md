@@ -71,7 +71,15 @@ FRONTEND_URL=http://172.30.1.17:3000
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
 
 # Slack 채널 ID (공식 채널)
-SLACK_CHANNEL_ID=C034EQD6W4W
+# - 공식 채널로 전송할 때 사용
+SLACK_OFFICIAL_CHANNEL_ID=C034EQD6W4W
+
+# Slack 채널 ID (테스트/공개 채널)
+# - 기본 전송 채널(테스트)로 사용
+SLACK_TEST_CHANNEL_ID=C071ZL69JQZ
+
+# (레거시) SLACK_CHANNEL_ID는 SLACK_TEST_CHANNEL_ID로 취급됩니다.
+# SLACK_CHANNEL_ID=C071ZL69JQZ
 
 # Slack 유저그룹 ID (EAP 파트 멘션용)
 SLACK_EAP_USERGROUP=S08SE5ZTPQD

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
+from utils.constants import SLACK_PRODUCTION_CHANNEL_ID
 
 # 환경변수 로드
 load_dotenv()
@@ -75,15 +76,26 @@ def send_report_to_slack(
     # 환경변수에서 토큰과 채널 ID 가져오기
     if not slack_token:
         slack_token = os.getenv('SLACK_BOT_TOKEN')
+
+    # 채널 ID 해석 (공식/테스트 분리 + 레거시 호환)
+    # - SLACK_OFFICIAL_CHANNEL_ID: 공식 채널 (기본값: SLACK_PRODUCTION_CHANNEL_ID)
+    # - SLACK_TEST_CHANNEL_ID: 테스트 채널
+    # - SLACK_CHANNEL_ID: (레거시) 테스트 채널로 취급
+    official_channel_id = os.getenv('SLACK_OFFICIAL_CHANNEL_ID', SLACK_PRODUCTION_CHANNEL_ID)
+    test_channel_id = os.getenv('SLACK_TEST_CHANNEL_ID') or os.getenv('SLACK_CHANNEL_ID')
+
     if not channel_id:
-        channel_id = os.getenv('SLACK_CHANNEL_ID')
+        # 기존 동작(테스트 채널로 전송)을 유지하되, 새 변수 우선
+        channel_id = test_channel_id
     
     if not slack_token:
         print("❌ SLACK_BOT_TOKEN 환경변수가 설정되지 않았습니다.")
         return False
     
     if not channel_id:
-        print("❌ SLACK_CHANNEL_ID 환경변수가 설정되지 않았습니다.")
+        print("❌ Slack 채널 ID가 설정되지 않았습니다.")
+        print("   테스트 채널: SLACK_TEST_CHANNEL_ID (또는 레거시 SLACK_CHANNEL_ID)")
+        print(f"   공식 채널(참고): SLACK_OFFICIAL_CHANNEL_ID (기본값 {official_channel_id})")
         return False
     
     try:
@@ -99,11 +111,18 @@ def send_report_to_slack(
         # 리포트 데이터가 딕셔너리인 경우 (메타데이터 포함)
         if isinstance(report_data, dict):
             announcements = report_data.get('announcements', [])
-            # 이미 전송된 경우 중복 방지
+            # 이미 전송된 경우 중복 방지 (채널별)
             if report_data.get('slack_sent', False):
-                print(f"⚠️  이 리포트는 이미 슬랙으로 전송되었습니다.")
-                print(f"   중복 전송을 방지하기 위해 건너뜁니다.")
-                return True
+                prev_channel = report_data.get('slack_channel')
+                if prev_channel and prev_channel == channel_id:
+                    print(f"⚠️  이 리포트는 이미 슬랙으로 전송되었습니다.")
+                    print(f"   중복 전송을 방지하기 위해 건너뜁니다.")
+                    return True
+                # 다른 채널로는 전송 허용 (예: 테스트→공식)
+                if prev_channel and prev_channel != channel_id:
+                    print("⚠️  이 리포트는 다른 채널로 이미 전송된 이력이 있습니다.")
+                    print(f"   이전 채널: {prev_channel}")
+                    print(f"   이번 채널: {channel_id}")
         elif isinstance(report_data, list):
             announcements = report_data
         else:
@@ -275,6 +294,20 @@ def send_report_to_slack(
                     'slack_channel': channel_id
                 }
             else:
+                # 전송 이력 누적 (선택적으로 관리)
+                prev_channel = report_data.get('slack_channel')
+                prev_sent_at = report_data.get('slack_sent_at')
+                if prev_channel or prev_sent_at:
+                    history = report_data.get('slack_sent_history')
+                    if not isinstance(history, list):
+                        history = []
+                    # 마지막 전송 정보를 history에 보관
+                    history.append({
+                        'channel': prev_channel,
+                        'sent_at': prev_sent_at,
+                    })
+                    report_data['slack_sent_history'] = history
+
                 report_data['slack_sent'] = True
                 report_data['slack_sent_at'] = datetime.now().isoformat()
                 report_data['slack_channel'] = channel_id
