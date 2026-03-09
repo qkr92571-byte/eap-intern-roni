@@ -21,6 +21,7 @@ from scripts.process_approved_announcements import process_approved_announcement
 from utils.constants import STATUS_APPROVED, STATUS_REJECTED, SLACK_PRODUCTION_CHANNEL_ID
 from utils.logger import StepLogger
 from orchestration.policies import request_confirmation
+import os
 
 
 class WorkflowService:
@@ -257,24 +258,38 @@ class WorkflowService:
             self.logger.warning("리포트 파일을 찾을 수 없어 슬랙 전송을 건너뜁니다.")
             return False
         
-        # 사용자 컨펌 요청 (공식 채널 전송)
-        self.logger.warning("공식 채널로 슬랙 메시지를 전송하시겠습니까?")
-        self.logger.info(f"공식 채널: {SLACK_PRODUCTION_CHANNEL_ID}")
-        self.logger.info("이 작업은 공식 슬랙 채널에 리포트 메시지를 전송합니다.")
-        
-        if not self.auto_upload:
-            if not request_confirmation("계속하려면 'yes' 또는 'y'를 입력하세요: "):
-                self.logger.warning("사용자가 공식 채널 전송을 취소했습니다.")
-                return False
-        
-        self.logger.success("사용자 컨펌 확인됨. 공식 채널로 전송을 시작합니다...")
-        self.logger.info(f"공식 채널: {SLACK_PRODUCTION_CHANNEL_ID}")
-        
-        success = send_report_to_slack(str(report_file), channel_id=SLACK_PRODUCTION_CHANNEL_ID)
-        if success:
-            self.logger.success("공식 채널 슬랙 메시지 전송 완료")
+        official_channel = os.getenv('SLACK_OFFICIAL_CHANNEL_ID', SLACK_PRODUCTION_CHANNEL_ID)
+        test_channel = os.getenv('SLACK_TEST_CHANNEL_ID') or os.getenv('SLACK_CHANNEL_ID')
+
+        # 자동 모드면 기존처럼 공식 채널로 전송
+        if self.auto_upload:
+            self.logger.success("자동 모드: 공식 채널로 전송을 시작합니다...")
+            channel_id = official_channel
         else:
-            self.logger.warning("공식 채널 슬랙 메시지 전송 실패 (환경변수 확인 필요)")
+            # 사용자에게 3옵션 제공
+            self.logger.warning("슬랙 메시지를 어느 채널로 전송할까요?")
+            self.logger.info(f"1) 공식채널: {official_channel}")
+            self.logger.info(f"2) 테스트 채널: {test_channel or '(미설정)'}")
+            self.logger.info("3) 건너뛰기")
+
+            choice = input("선택 (1/2/3): ").strip()
+            if choice == "1":
+                channel_id = official_channel
+            elif choice == "2":
+                channel_id = test_channel
+                if not channel_id:
+                    self.logger.warning("테스트 채널이 설정되지 않아 슬랙 전송을 건너뜁니다.")
+                    return False
+            else:
+                self.logger.warning("사용자가 슬랙 전송을 건너뛰었습니다.")
+                return False
+
+        self.logger.info(f"전송 채널: {channel_id}")
+        success = send_report_to_slack(str(report_file), channel_id=channel_id)
+        if success:
+            self.logger.success("슬랙 메시지 전송 완료")
+        else:
+            self.logger.warning("슬랙 메시지 전송 실패 (환경변수 확인 필요)")
         
         return success
     

@@ -215,7 +215,10 @@ class Orchestrator:
         if results.get('slack_result'):
             sr = results['slack_result']
             if sr.get('success'):
-                self.logger.info("[슬랙] 전송 완료")
+                if sr.get('skipped'):
+                    self.logger.info("[슬랙] 전송 건너뜀")
+                else:
+                    self.logger.info("[슬랙] 전송 완료")
             else:
                 self.logger.warning(f"[슬랙] 전송 실패: {sr.get('error')}")
         

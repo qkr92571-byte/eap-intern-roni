@@ -20,12 +20,41 @@ Skill: 슬랙 리포트 전송
 from datetime import datetime
 from typing import Optional, Dict
 from pathlib import Path
+import os
 
 from services.slack_service import send_report_to_slack
 from services.file_service import REPORT_DIR, get_date_string
 from utils.constants import SLACK_PRODUCTION_CHANNEL_ID
 from orchestration.policies import should_confirm, request_confirmation
 from utils.logger import StepLogger
+
+
+def _choose_slack_channel_interactive() -> Optional[str]:
+    """
+    슬랙 전송 채널 선택 (대화형)
+
+    옵션:
+    1) 공식채널
+    2) 테스트 채널
+    3) 건너뛰기
+    """
+    official = os.getenv('SLACK_OFFICIAL_CHANNEL_ID', SLACK_PRODUCTION_CHANNEL_ID)
+    test = os.getenv('SLACK_TEST_CHANNEL_ID') or os.getenv('SLACK_CHANNEL_ID')
+
+    print("=" * 60)
+    print("슬랙 전송 채널 선택")
+    print("=" * 60)
+    print(f"1) 공식채널: {official}")
+    print(f"2) 테스트 채널: {test or '(미설정)'}")
+    print("3) 건너뛰기")
+    print()
+
+    choice = input("선택 (1/2/3): ").strip()
+    if choice == "1":
+        return official
+    if choice == "2":
+        return test
+    return None
 
 
 def skill_send_slack_report(
@@ -71,17 +100,27 @@ def skill_send_slack_report(
                 'success': False,
                 'error': error_msg
             }
-        
-        # 채널 ID 결정
+
+        # 컨펌 정책(대화형)일 때: 채널 선택(공식/테스트/건너뛰기)
+        if should_confirm(confirm_policy) and channel_id is None:
+            chosen = _choose_slack_channel_interactive()
+            if not chosen:
+                logger.warning("사용자가 슬랙 전송을 건너뛰었습니다.")
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'error': None
+                }
+            channel_id = chosen
+
+        # 채널 ID 기본값(자동 모드 또는 명시적 채널)
         if channel_id is None:
-            channel_id = SLACK_PRODUCTION_CHANNEL_ID
+            channel_id = os.getenv('SLACK_OFFICIAL_CHANNEL_ID', SLACK_PRODUCTION_CHANNEL_ID)
         
-        # 컨펌 정책 확인
-        if should_confirm(confirm_policy):
-            logger.warning("공식 채널로 슬랙 메시지를 전송하시겠습니까?")
-            logger.info(f"공식 채널: {channel_id}")
-            logger.info("이 작업은 공식 슬랙 채널에 리포트 메시지를 전송합니다.")
-            
+        # 채널이 명시된 경우에만 추가 컨펌(선택적으로 유지)
+        if should_confirm(confirm_policy) and channel_id is not None:
+            logger.warning("선택한 채널로 슬랙 메시지를 전송하시겠습니까?")
+            logger.info(f"채널: {channel_id}")
             if not request_confirmation("계속하려면 'yes' 또는 'y'를 입력하세요"):
                 logger.warning("사용자가 슬랙 전송을 취소했습니다.")
                 return {
@@ -102,6 +141,7 @@ def skill_send_slack_report(
             logger.success("슬랙 메시지 전송 완료")
             return {
                 'success': True,
+                'skipped': False,
                 'error': None
             }
         else:

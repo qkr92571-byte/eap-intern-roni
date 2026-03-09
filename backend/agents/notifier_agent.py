@@ -54,7 +54,10 @@ class NotifierAgent:
         )
         
         if result.get('success'):
-            self.logger.success("슬랙 메시지 전송 완료")
+            if result.get('skipped'):
+                self.logger.warning("슬랙 전송 건너뜀")
+            else:
+                self.logger.success("슬랙 메시지 전송 완료")
         else:
             self.logger.warning(f"슬랙 전송 실패: {result.get('error')}")
         
