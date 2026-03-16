@@ -46,7 +46,9 @@ def _build_g2b_detail_url(announcement_number: str) -> Optional[str]:
         return None
 
     bid_no = m.group("no")
-    bid_ord = m.group("ord")
+    bid_ord_raw = m.group("ord")
+    # 나라장터 상세 URL은 보통 bidPbancOrd가 3자리(예: 000)인 경우가 많아 zero-padding 처리
+    bid_ord = bid_ord_raw.zfill(3)
     return f"https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo={bid_no}&bidPbancOrd={bid_ord}"
 
 
