@@ -67,10 +67,9 @@ eap-intern-roni/
 │   └── utils/                 # 공통 유틸리티 (OpenAI 클라이언트, 로거 등)
 │
 ├── Makefile                   # 백엔드 편의 명령어 (make daily 등)
-├── QUICK_START.md             # 빠른 시작 가이드
-├── ENV_SETUP.md               # 환경 변수 설정 가이드
-├── WORKFLOW_GUIDE.md          # 일일 리포트 생성 워크플로우 상세
-├── DAILY_CHECKLIST.md         # 운영용 체크리스트
+├── CLAUDE.md                  # AI(Claude Code) 개발 규칙
+├── FIREBASE_SETUP.md          # Firebase 초기 설정 가이드
+├── SCHEMA_DOCUMENTATION.md    # Firestore 데이터 스키마 명세
 └── README.md
 ```
 
@@ -78,13 +77,11 @@ eap-intern-roni/
 
 ## 빠른 시작
 
-### 1) 필수 문서
+### 1) 참고 문서
 
-1. **[QUICK_START.md](./QUICK_START.md)** – 프로젝트 클론부터 첫 리포트 생성까지 (5분 가이드)
-2. **[ENV_SETUP.md](./ENV_SETUP.md)** – `.env` 및 환경 변수 설정
-3. **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** – Firebase 서비스 계정 키 및 Firestore 설정
-4. **[WORKFLOW_GUIDE.md](./WORKFLOW_GUIDE.md)** – 일일 리포트 생성 전체 프로세스
-5. **[DAILY_CHECKLIST.md](./DAILY_CHECKLIST.md)** – 매일 점검해야 할 항목
+- **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** – Firebase 서비스 계정 키 및 Firestore 초기 설정
+- **[SCHEMA_DOCUMENTATION.md](./SCHEMA_DOCUMENTATION.md)** – Firestore 데이터 스키마 명세
+- **[CLAUDE.md](./CLAUDE.md)** – AI(Claude Code) 개발 규칙 및 운영 가이드
 
 ---
 
@@ -115,8 +112,12 @@ OPENAI_API_KEY=sk-...
 
 # Slack (선택, Slack 알림 기능 사용 시)
 SLACK_BOT_TOKEN=xoxb-...
-SLACK_CHANNEL_ID=C034EQD6W4W
+SLACK_OFFICIAL_CHANNEL_ID=C034EQD6W4W
+SLACK_TEST_CHANNEL_ID=C071ZL69JQZ
 SLACK_EAP_USERGROUP=S08SE5ZTPQD
+
+# 프론트엔드 URL (Slack 메시지 링크용)
+FRONTEND_URL=https://eap-intern-roni.web.app
 
 # 기타 설정 (필요 시)
 # SKIP_FIRESTORE_PROMPT=true  # Firestore에서 프롬프트를 가져오지 않고 로컬 파일 사용
@@ -146,7 +147,6 @@ npm start
 프로젝트 루트에서:
 
 ```bash
-cd /Users/hyeonsanglee/Documents/project/eap-intern-roni
 make daily
 ```
 
@@ -164,8 +164,6 @@ make daily
 ### 2) 직접 엔트리포인트 실행
 
 ```bash
-cd /Users/hyeonsanglee/Documents/project/eap-intern-roni
-
 # 오늘자(KST 기준) 리포트 생성 (슬랙 제외)
 python3 -m backend.entrypoints.daily_report --skip-slack --auto
 
@@ -273,6 +271,7 @@ python3 -m backend.entrypoints.daily_report --date 2026-02-03 --skip-slack --aut
 
 ## 문의 / 유지보수
 
-- **운영 플로우**: `WORKFLOW_GUIDE.md`, `DAILY_CHECKLIST.md`를 우선 참고
-- **코드 구조/설계**: `SYSTEM_ARCHITECTURE.md`, `SCHEMA_DOCUMENTATION.md`
+- **운영 규칙 및 워크플로우**: [CLAUDE.md](./CLAUDE.md) 참고
+- **스키마/데이터 구조**: [SCHEMA_DOCUMENTATION.md](./SCHEMA_DOCUMENTATION.md) 참고
+- **Firebase 초기 설정**: [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) 참고
 - 구조/설계 개선이 필요할 경우, Orchestrator 및 각 에이전트/스킬 레이어를 기준으로 변경 범위를 분리해서 작업하는 것을 권장합니다.
