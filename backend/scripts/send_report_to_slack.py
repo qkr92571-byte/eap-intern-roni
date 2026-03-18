@@ -65,7 +65,7 @@ def print_preview(report_path: Path) -> dict:
     formatted_date = _format_date_from_filename(report_path) or "날짜 미상"
     usergroup_id = os.getenv("SLACK_EAP_USERGROUP", "S08SE5ZTPQD")
     usergroup_mention = f"<!subteam^{usergroup_id}|@eap파트>"
-    frontend_url = os.getenv("FRONTEND_URL", "http://172.30.1.17:3000")
+    frontend_url = os.getenv("FRONTEND_URL", "https://eap-intern-roni.web.app")
 
     print("=" * 60)
     print("슬랙 메시지 예시 (프리뷰)")
@@ -98,7 +98,7 @@ def print_preview(report_path: Path) -> dict:
                 print(f"{i}. {title} ({ann_no})")
     print()
     print("*전체 리포트*")
-    print(f"<{frontend_url}|프론트엔드에서 보기>")
+    print(f"<{frontend_url}|인턴로니 웹사이트 이동>")
     print()
 
     meta = {}

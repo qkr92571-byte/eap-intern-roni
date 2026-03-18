@@ -256,12 +256,12 @@ def send_report_to_slack(
         
         # 6. 전체 리포트 링크 (프론트엔드 URL)
         # 슬랙 메시지에서 "프론트엔드에서 보기" 링크가 랜딩될 기본 주소
-        frontend_url = os.getenv('FRONTEND_URL', 'http://172.30.1.17:3000')
+        frontend_url = os.getenv('FRONTEND_URL', 'https://eap-intern-roni.web.app')
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*전체 리포트*\n<{frontend_url}|프론트엔드에서 보기>"
+                "text": f"*전체 리포트*\n<{frontend_url}|인턴로니 웹사이트 이동>"
             }
         })
         
