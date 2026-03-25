@@ -1,0 +1,33 @@
+name: Test Setup Script (Windows)
+
+on:
+  push:
+    paths:
+      - 'setup.py'
+      - 'backend/requirements.txt'
+      - 'frontend/package.json'
+  pull_request:
+    paths:
+      - 'setup.py'
+      - 'backend/requirements.txt'
+      - 'frontend/package.json'
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Node.js 18 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: setup.py 실행
+        run: python setup.py

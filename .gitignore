@@ -38,6 +38,7 @@ yarn-error.log*
 Thumbs.db
 
 # Firebase
+.firebase/
 firebase-adminsdk-*.json
 serviceAccountKey.json
 config/firebase-credentials.json
