@@ -2,8 +2,12 @@
 EAP 인턴로니 시스템 설치 스크립트
 실행: python setup.py
 """
-import subprocess
 import sys
+import subprocess
+
+# Windows 터미널의 cp1252 인코딩 문제 방지 (한국어 출력용)
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 import os
 
 def run(cmd, **kwargs):
