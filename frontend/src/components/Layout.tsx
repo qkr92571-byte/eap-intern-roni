@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
+  Dashboard as DashboardIcon,
   Article as ArticleIcon,
   TrendingUp as TrendingUpIcon,
   Settings as SettingsIcon,
@@ -37,7 +38,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
-    { label: '공고 목록', path: '/', icon: <ArticleIcon /> },
+    { label: '홈', path: '/', icon: <DashboardIcon /> },
+    { label: '공고 목록', path: '/announcements', icon: <ArticleIcon /> },
     { label: '경쟁사 동향', path: '/competitors', icon: <TrendingUpIcon /> },
     { label: '설정', path: '/settings', icon: <SettingsIcon /> },
   ];
@@ -57,8 +59,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <Box>
       <List sx={{ py: 1 }}>
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path || 
-            (item.path === '/' && location.pathname.startsWith('/announcements')) ||
+          const isActive = location.pathname === item.path ||
+            (item.path === '/announcements' && location.pathname.startsWith('/announcements')) ||
             (item.path === '/settings' && location.pathname.startsWith('/settings'));
           
           return (

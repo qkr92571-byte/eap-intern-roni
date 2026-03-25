@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
+import Home from './pages/Home';
 import AnnouncementList from './pages/AnnouncementList';
 import AnnouncementDetail from './pages/AnnouncementDetail';
 import CompetitorTrends from './pages/CompetitorTrends';
@@ -27,7 +28,7 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<AnnouncementList />} />
+            <Route path="/" element={<Home />} />
             <Route path="/announcements" element={<AnnouncementList />} />
             <Route path="/announcements/:id" element={<AnnouncementDetail />} />
             <Route path="/competitors" element={<CompetitorTrends />} />
