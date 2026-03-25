@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, limit as fsLimit, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit as fsLimit, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Announcement, ApiResponse } from '../types';
 
@@ -14,21 +14,20 @@ const getAnnouncementsFromFirestore = async (params?: {
 
     const q = collection(db, 'announcements');
 
-    // 정렬 없이 먼저 조회 (인덱스 문제 방지)
-    const snapshot = await getDocs(query(q, fsLimit(limit ?? 200)));
-    
+    // display_status=20(노출)인 것만 서버에서 필터링 (삭제된 공고 제외)
+    // 정렬은 인덱스 문제 방지를 위해 클라이언트에서 수행
+    const snapshot = await getDocs(
+      query(q, where('display_status', '==', 20), fsLimit(limit ?? 500))
+    );
+
     const announcements: Announcement[] = [];
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as any;
-      // display_status가 없거나 20인 것만 표시 (40은 삭제됨)
-      const displayStatus = data.display_status ?? 20; // 기본값 20
-      if (displayStatus === 20) {
       announcements.push({
         id: docSnap.id,
         ...data,
       } as Announcement);
-      }
     });
 
     // 클라이언트 측에서 정렬 (created_at 기준, 수집일순)

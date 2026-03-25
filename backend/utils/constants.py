@@ -21,12 +21,12 @@ MIN_BUDGET = 1000000  # 100만원
 MAX_BUDGET = 100000000000  # 1000억원
 
 # OpenAI 모델 설정
-OPENAI_MODEL_REVIEW = 'gpt-3.5-turbo'  # 검수용 모델
+OPENAI_MODEL_REVIEW = 'gpt-4o-mini'  # 검수용 모델 (첨부파일 내용 포함 처리에 적합)
 OPENAI_MODEL_SERVICE_EXTRACTION = 'gpt-4o-mini'  # 서비스 항목 추출용 모델 (비용 효율적)
 
 # OpenAI API 설정
 OPENAI_TIMEOUT = 60.0  # 초
-OPENAI_MAX_TOKENS_REVIEW = 400  # 검수용 최대 토큰
+OPENAI_MAX_TOKENS_REVIEW = 800  # 검수용 최대 토큰 (JSON + 근거 텍스트 포함)
 OPENAI_MAX_TOKENS_SERVICE_EXTRACTION = 2000  # 서비스 항목 추출용 최대 토큰
 OPENAI_TEMPERATURE_REVIEW = 0.3  # 검수용 temperature
 OPENAI_TEMPERATURE_SERVICE_EXTRACTION = 0.2  # 서비스 항목 추출용 temperature

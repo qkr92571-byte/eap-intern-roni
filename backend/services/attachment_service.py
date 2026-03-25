@@ -251,8 +251,11 @@ def download_attachments(
 def extract_text_from_file(file_path: Path) -> Tuple[str, str]:
     """
     첨부파일에서 텍스트 추출
+    지원 포맷: PDF, DOCX, HWP, HWPX
+
     Returns:
         (status, text or error)
+        status: 'ok' | 'error' | 'unsupported'
     """
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
@@ -275,77 +278,161 @@ def extract_text_from_file(file_path: Path) -> Tuple[str, str]:
         except Exception as e:  # noqa: BLE001
             return "error", f"DOCX 추출 실패: {str(e)}"
 
+    if suffix == ".hwpx":
+        # HWPX = ZIP 기반 XML 포맷 (HWP의 XML 버전)
+        return _extract_text_from_hwpx(file_path)
+
     if suffix == ".hwp":
-        try:
-            # hwp5 라이브러리를 사용한 텍스트 추출
-            from hwp5.filestructure import Hwp5File
-            from hwp5.recordstream import read_records
-            from hwp5.binmodel import ParaText
-            
-            hwp5_file = Hwp5File(str(file_path))
-            
-            # BodyText에서 텍스트 추출
-            texts = []
-            
-            if 'BodyText' in hwp5_file:
-                bodytext = hwp5_file['BodyText']
-                
-                # 각 섹션 처리 (Section0, Section1, ...)
-                for section_name in bodytext:
-                    if section_name.startswith('Section'):
-                        section = bodytext[section_name]
-                        
-                        # 레코드 스트림 읽기
-                        try:
-                            stream = section.open()
-                            for record in read_records(stream):
-                                # HWPTAG_PARA_TEXT 레코드에서 텍스트 추출
-                                if record.get('tagname') == 'HWPTAG_PARA_TEXT':
-                                    payload = record.get('payload')
-                                    if payload:
-                                        try:
-                                            # ParaText 모델로 파싱
-                                            para_text = ParaText(payload)
-                                            # 텍스트 추출
-                                            if hasattr(para_text, 'chars'):
-                                                for char in para_text.chars:
-                                                    if hasattr(char, 'ch'):
-                                                        texts.append(char.ch)
-                                                    elif isinstance(char, str):
-                                                        texts.append(char)
-                                        except Exception:
-                                            # 파싱 실패 시 직접 디코딩 시도
-                                            try:
-                                                decoded = payload.decode('utf-16-le', errors='ignore')
-                                                # 의미있는 텍스트만 추출
-                                                cleaned = ''.join(
-                                                    c for c in decoded 
-                                                    if '\uAC00' <= c <= '\uD7A3' or  # 한글
-                                                    '\u3131' <= c <= '\u318E' or  # 자모
-                                                    c.isalnum() or c.isspace() or c in '.,;:!?()[]{}'
-                                                )
-                                                if cleaned.strip():
-                                                    texts.append(cleaned)
-                                            except Exception:
-                                                pass
-                        except Exception:
-                            continue
-            
-            if texts:
-                result_text = ''.join(texts).strip()
-                if result_text:
-                    return "ok", result_text
-                else:
-                    return "error", "HWP 파일에서 텍스트를 추출할 수 없습니다 (빈 문서일 수 있음)"
-            else:
-                return "error", "HWP 파일에서 텍스트를 찾을 수 없습니다"
-                    
-        except ImportError:
-            return "error", "hwp5 라이브러리가 설치되지 않았습니다. pip install hwp5로 설치해주세요."
-        except Exception as e:  # noqa: BLE001
-            return "error", f"HWP 파일 처리 중 오류: {str(e)}"
+        # HWP 추출 fallback 체인: hwp5 → olefile 직접 파싱
+        return _extract_text_from_hwp(file_path)
 
     return "unsupported", f"{suffix} 포맷은 현재 추출을 지원하지 않습니다."
+
+
+def _extract_text_from_hwpx(file_path: Path) -> Tuple[str, str]:
+    """
+    HWPX 파일 텍스트 추출 (ZIP + XML 구조)
+    HWPX는 ZIP 압축 파일로, Contents/section0.xml 등에 본문이 있음
+    """
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        with zipfile.ZipFile(str(file_path), 'r') as zf:
+            # 섹션 파일 목록 수집 (section0.xml, section1.xml, ...)
+            section_files = sorted(
+                [name for name in zf.namelist() if re.match(r'Contents/section\d+\.xml', name)]
+            )
+            if not section_files:
+                return "error", "HWPX 파일에서 본문 섹션을 찾을 수 없습니다."
+
+            texts = []
+            for section_file in section_files:
+                try:
+                    xml_bytes = zf.read(section_file)
+                    root = ET.fromstring(xml_bytes)
+                    # hwpml 네임스페이스 내 텍스트 노드 추출
+                    for elem in root.iter():
+                        if elem.text and elem.text.strip():
+                            texts.append(elem.text.strip())
+                        if elem.tail and elem.tail.strip():
+                            texts.append(elem.tail.strip())
+                except Exception:
+                    continue
+
+        if texts:
+            return "ok", '\n'.join(texts)
+        return "error", "HWPX 파일에서 텍스트를 추출할 수 없습니다."
+
+    except Exception as e:
+        return "error", f"HWPX 파일 처리 중 오류: {str(e)}"
+
+
+def _extract_text_from_hwp(file_path: Path) -> Tuple[str, str]:
+    """
+    HWP 파일 텍스트 추출 (fallback 체인)
+    1단계: hwp5 라이브러리
+    2단계: olefile + BodyText 스트림 직접 UTF-16 디코딩
+    """
+    # 1단계: hwp5 라이브러리 시도
+    try:
+        from hwp5.filestructure import Hwp5File
+        from hwp5.recordstream import read_records
+
+        hwp5_file = Hwp5File(str(file_path))
+        texts = []
+
+        if 'BodyText' in hwp5_file:
+            bodytext = hwp5_file['BodyText']
+            for section_name in bodytext:
+                if not section_name.startswith('Section'):
+                    continue
+                try:
+                    stream = bodytext[section_name].open()
+                    for record in read_records(stream):
+                        if record.get('tagname') == 'HWPTAG_PARA_TEXT':
+                            payload = record.get('payload')
+                            if payload:
+                                try:
+                                    decoded = payload.decode('utf-16-le', errors='ignore')
+                                    cleaned = _clean_hwp_text(decoded)
+                                    if cleaned:
+                                        texts.append(cleaned)
+                                except Exception:
+                                    pass
+                except Exception:
+                    continue
+
+        if texts:
+            result = '\n'.join(texts).strip()
+            if result:
+                return "ok", result
+
+    except ImportError:
+        pass  # hwp5 없으면 다음 단계로
+    except Exception:
+        pass  # hwp5 실패 시 다음 단계로
+
+    # 2단계: olefile + BodyText 스트림 직접 파싱
+    try:
+        import olefile
+
+        if not olefile.isOleFile(str(file_path)):
+            return "error", "HWP 파일 형식이 올바르지 않습니다."
+
+        ole = olefile.OleFileIO(str(file_path))
+        texts = []
+
+        # BodyText/Section0, Section1, ... 스트림에서 텍스트 추출
+        for i in range(20):  # 섹션 최대 20개 시도
+            stream_path = f'BodyText/Section{i}'
+            if not ole.exists(stream_path):
+                break
+            try:
+                data = ole.openstream(stream_path).read()
+                # HWP 본문 스트림은 zlib 압축되어 있을 수 있음
+                try:
+                    import zlib
+                    data = zlib.decompress(data, -15)
+                except Exception:
+                    pass  # 비압축 데이터면 그대로 사용
+
+                # UTF-16-LE로 디코딩 후 의미 있는 텍스트만 추출
+                decoded = data.decode('utf-16-le', errors='ignore')
+                cleaned = _clean_hwp_text(decoded)
+                if cleaned:
+                    texts.append(cleaned)
+            except Exception:
+                continue
+
+        ole.close()
+
+        if texts:
+            result = '\n'.join(texts).strip()
+            if result:
+                return "ok", result
+        return "error", "HWP 파일에서 텍스트를 추출할 수 없습니다."
+
+    except ImportError:
+        return "error", "olefile 라이브러리가 필요합니다. pip install olefile로 설치해주세요."
+    except Exception as e:
+        return "error", f"HWP 파일 처리 중 오류: {str(e)}"
+
+
+def _clean_hwp_text(text: str) -> str:
+    """HWP 바이너리 디코딩 후 의미 있는 문자만 추출"""
+    cleaned = ''.join(
+        c for c in text
+        if '\uAC00' <= c <= '\uD7A3'   # 한글 완성형
+        or '\u3131' <= c <= '\u318E'   # 한글 자모
+        or c.isalnum()
+        or c.isspace()
+        or c in '.,;:!?()[]{}<>-_/\\%@#$&*+=\'"'
+    )
+    # 연속 공백 정리
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 
 def summarize_attachment_text(text: str, max_chars: int = 1200) -> str:

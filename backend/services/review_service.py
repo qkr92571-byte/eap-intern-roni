@@ -7,7 +7,7 @@
 import os
 import json
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 from services.file_service import load_report, REPORT_DIR, get_date_string
@@ -15,6 +15,7 @@ from orchestration.policies import request_confirmation
 from services.prompt_service import get_prompt as get_prompt_from_firestore
 from utils.openai_client import get_openai_client
 from utils.constants import (
+    STATUS_PENDING,
     STATUS_APPROVED,
     STATUS_REJECTED,
     OPENAI_MODEL_REVIEW,
@@ -67,6 +68,19 @@ EXCLUSION_KEYWORDS = [
     # '파견 용역', '파견용역'은 제외하지 않음 (필요한 공고가 있을 수 있음)
 ]
 
+# 제목만으로 명확히 적합 판단할 수 있는 키워드 패턴
+# keyword: 이 문자열이 제목에 포함되면 적합 가능성 높음
+# exceptions: keyword와 함께 있을 때 fast_approve 불가 (시스템 개발 등 제외)
+FAST_APPROVE_PATTERNS = [
+    {'keyword': '찾아가는 상담실', 'exceptions': ['개발', '구축', '시스템']},
+    {'keyword': '근로자지원프로그램(EAP)', 'exceptions': ['개발', '구축']},
+    {'keyword': 'EAP 운영', 'exceptions': ['개발', '구축']},
+]
+
+# 검수용 첨부파일 텍스트 제한
+ATTACHMENT_MAX_CHARS_PER_FILE = 2000   # 파일 1개당 최대 문자 수
+ATTACHMENT_MAX_TOTAL_CHARS = 4000      # GPT에 전달할 전체 최대 문자 수
+
 def should_exclude_by_keywords(announcement: Dict) -> tuple[bool, str]:
     """
     제외 키워드로 인한 자동 부적합 판단
@@ -84,6 +98,87 @@ def should_exclude_by_keywords(announcement: Dict) -> tuple[bool, str]:
             return True, f"제외 키워드 포함: '{keyword}'"
     
     return False, ""
+
+
+def classify_by_title(announcement: Dict) -> str:
+    """
+    제목 기반 빠른 분류 (1단계 필터)
+
+    Returns:
+        'rejected'  - 제외 키워드 hit → 첨부파일 불필요
+        'approved'  - 명확 EAP 키워드 hit → 첨부파일 불필요
+        'uncertain' - 판단 불가 → 2단계(첨부파일 기반 GPT) 필요
+    """
+    # 제외 키워드 체크
+    exclude, _ = should_exclude_by_keywords(announcement)
+    if exclude:
+        return 'rejected'
+
+    title = announcement.get('title', '')
+
+    # 명확 적합 키워드 체크
+    for pattern in FAST_APPROVE_PATTERNS:
+        if pattern['keyword'] in title:
+            has_exception = any(exc in title for exc in pattern['exceptions'])
+            if not has_exception:
+                return 'approved'
+
+    return 'uncertain'
+
+
+def fetch_attachment_text_for_review(
+    announcement_number: str,
+    title: Optional[str] = None,
+    created_at: Optional[str] = None,
+) -> Tuple[str, str]:
+    """
+    검수용 첨부파일 텍스트 추출 (2단계 필터에서 호출)
+
+    Returns:
+        (text, method)
+        method: 'with_attachment' | 'attachment_failed'
+    """
+    try:
+        from services.attachment_service import analyze_attachments
+
+        print(f"      첨부파일 다운로드 중: {announcement_number}")
+        result = analyze_attachments(
+            announcement_number,
+            bid_ord='000',
+            title=title,
+            created_at=created_at,
+        )
+
+        if not result.get('success'):
+            print(f"      ⚠️  첨부파일 다운로드 실패: {result.get('error', '알 수 없는 오류')}")
+            return '', 'attachment_failed'
+
+        texts = []
+        total_chars = 0
+
+        for att in result.get('attachments', []):
+            # zip 압축 해제된 파일 목록 우선 처리
+            files_to_check = att.get('extracted_files', []) or [att]
+            for f in files_to_check:
+                if f.get('extract_status') == 'ok' and total_chars < ATTACHMENT_MAX_TOTAL_CHARS:
+                    summary = f.get('summary', '')
+                    if summary:
+                        chunk = summary[:ATTACHMENT_MAX_CHARS_PER_FILE]
+                        filename = f.get('name', '알 수 없는 파일')
+                        texts.append(f"[파일명: {filename}]\n{chunk}")
+                        total_chars += len(chunk)
+
+        if texts:
+            print(f"      ✅ 첨부파일 텍스트 추출 완료 ({total_chars}자, {len(texts)}개 파일)")
+            return '\n\n'.join(texts), 'with_attachment'
+        else:
+            print(f"      ⚠️  첨부파일에서 텍스트를 추출하지 못했습니다.")
+            return '', 'attachment_failed'
+
+    except Exception as e:
+        print(f"      ❌ 첨부파일 텍스트 추출 중 오류: {e}")
+        return '', 'attachment_failed'
+
 
 def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
     """
@@ -151,74 +246,137 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 }
             print()
         
-        # 각 공고 검수
-        print("\n2. ChatGPT API로 공고 검수 중...")
+        # 각 공고 검수 (2단계 파이프라인)
+        print("\n2. 공고 검수 중 (1단계: 키워드 필터 → 2단계: 첨부파일 기반 GPT 검수)...")
         reviewed_count = 0
         approved_count = 0
         rejected_count = 0
+        pending_count = 0
         error_count = 0
-        
+
         for idx, announcement in enumerate(report_data, 1):
             try:
                 announcement_number = announcement.get('announcement_number', '')
-                
-                # 이미 검수된 공고는 건너뛰기 (선택사항)
-                # 하지만 review_result가 없거나 status가 없는 경우 재검수
+                title = announcement.get('title', '')
+
+                # 이미 검수된 공고는 건너뛰기
                 if announcement.get('reviewed', False) and announcement.get('review_result') and announcement.get('status'):
                     print(f"   [{idx}/{len(report_data)}] 이미 검수됨: {announcement_number}")
                     reviewed_count += 1
-                    if announcement.get('status') == 'approved':
+                    status = announcement.get('status')
+                    if status == STATUS_APPROVED:
                         approved_count += 1
-                    elif announcement.get('status') == 'rejected':
+                    elif status == STATUS_REJECTED:
                         rejected_count += 1
+                    else:
+                        pending_count += 1
                     continue
-                
-                # 제외 키워드 체크 (ChatGPT 검수 전에 먼저 필터링)
-                exclude, exclude_reason = should_exclude_by_keywords(announcement)
-                if exclude:
-                    print(f"   [{idx}/{len(report_data)}] 🚫 제외 키워드: {announcement_number[:20]}... ({exclude_reason})")
-                    announcement['reviewed'] = True
-                    announcement['review_result'] = f"- 적합 여부: 부적합\n- 이유: {exclude_reason}"
-                    announcement['review_model'] = 'keyword-filter'
-                    announcement['reviewed_at'] = datetime.now().isoformat()
-                    announcement['status'] = STATUS_REJECTED
+
+                # ── 1단계: 제목 기반 빠른 분류 ──────────────────────────────
+                title_class = classify_by_title(announcement)
+
+                if title_class == 'rejected':
+                    _, exclude_reason = should_exclude_by_keywords(announcement)
+                    print(f"   [{idx}/{len(report_data)}] 🚫 [키워드필터] {title[:30]}... ({exclude_reason})")
+                    announcement.update({
+                        'reviewed': True,
+                        'review_method': 'keyword_filter',
+                        'rejection_reason': 'keyword_filter',
+                        'review_result': json.dumps({
+                            'decision': '부적합',
+                            'confidence': 100,
+                            'reason': exclude_reason,
+                            'key_evidence': exclude_reason,
+                        }, ensure_ascii=False),
+                        'review_model': 'keyword-filter',
+                        'reviewed_at': datetime.now().isoformat(),
+                        'status': STATUS_REJECTED,
+                    })
                     rejected_count += 1
                     reviewed_count += 1
                     continue
-                
-                # ChatGPT API로 검수
-                review_result = review_announcement_with_chatgpt(announcement)
-                
-                # 검수 결과를 공고 데이터에 반영
-                announcement['reviewed'] = True
-                announcement['review_result'] = review_result.get('result', '')
-                announcement['review_model'] = review_result.get('model', 'gpt-3.5-turbo')
-                announcement['reviewed_at'] = datetime.now().isoformat()
-                
-                if review_result.get('approved', False):
+
+                elif title_class == 'approved':
+                    matched_keyword = next(
+                        (p['keyword'] for p in FAST_APPROVE_PATTERNS if p['keyword'] in title),
+                        title[:20]
+                    )
+                    print(f"   [{idx}/{len(report_data)}] ✅ [제목확정] {title[:30]}...")
+                    announcement.update({
+                        'reviewed': True,
+                        'review_method': 'title_approved',
+                        'review_result': json.dumps({
+                            'decision': '적합',
+                            'confidence': 95,
+                            'reason': f'제목에 명확한 EAP 키워드 포함: {matched_keyword}',
+                            'key_evidence': matched_keyword,
+                        }, ensure_ascii=False),
+                        'review_model': 'title-filter',
+                        'reviewed_at': datetime.now().isoformat(),
+                        'status': STATUS_APPROVED,
+                    })
+                    approved_count += 1
+                    reviewed_count += 1
+                    continue
+
+                # ── 2단계: 첨부파일 기반 GPT 심층 검수 ─────────────────────
+                print(f"   [{idx}/{len(report_data)}] 🔍 [GPT검수] {title[:30]}...")
+
+                attachment_text, attach_method = fetch_attachment_text_for_review(
+                    announcement_number,
+                    title=title,
+                    created_at=announcement.get('created_at'),
+                )
+
+                review_result = review_announcement_with_chatgpt(announcement, attachment_text)
+
+                # 결과 반영
+                review_method = attach_method if not review_result.get('error') else 'attachment_failed'
+                announcement.update({
+                    'reviewed': True,
+                    'review_result': review_result.get('result', ''),
+                    'review_model': review_result.get('model', OPENAI_MODEL_REVIEW),
+                    'reviewed_at': datetime.now().isoformat(),
+                    'review_method': review_method,
+                })
+
+                if review_result.get('error') or review_result.get('approved') is None:
+                    # API 오류, JSON 파싱 실패, 불명확 → pending
+                    announcement['status'] = STATUS_PENDING
+                    announcement['rejection_reason'] = review_result.get('rejection_reason', 'api_error')
+                    status_icon = '⏸️ '
+                    pending_count += 1
+                elif review_result.get('approved') is True:
                     announcement['status'] = STATUS_APPROVED
+                    status_icon = '✅'
                     approved_count += 1
                 else:
                     announcement['status'] = STATUS_REJECTED
+                    announcement['rejection_reason'] = review_result.get('rejection_reason', 'gpt_decision')
+                    status_icon = '❌'
                     rejected_count += 1
-                
+
                 reviewed_count += 1
-                
-                # 진행 상황 출력 (10개마다)
-                if idx % 10 == 0:
-                    print(f"   진행 중... {idx}/{len(report_data)} (검수: {reviewed_count}, 승인: {approved_count}, 거부: {rejected_count})")
-                else:
-                    status_icon = "✅" if review_result.get('approved', False) else "❌"
-                    print(f"   [{idx}/{len(report_data)}] {status_icon} {announcement_number[:20]}...")
-                
+                attach_icon = '📎' if attach_method == 'with_attachment' else '📄'
+                print(f"      {status_icon} {attach_icon} {announcement_number[:25]}...")
+
             except Exception as e:
-                print(f"   [{idx}/{len(report_data)}] 검수 실패: {str(e)}")
+                print(f"   [{idx}/{len(report_data)}] ❌ 검수 실패: {str(e)}")
                 error_count += 1
-                # 오류 발생 시 기본값 설정
-                announcement['reviewed'] = True
-                announcement['review_result'] = f'검수 중 오류 발생: {str(e)}'
-                announcement['status'] = 'rejected'
-                rejected_count += 1
+                announcement.update({
+                    'reviewed': True,
+                    'review_result': json.dumps({
+                        'decision': '불명확',
+                        'confidence': 0,
+                        'reason': f'검수 중 오류 발생: {str(e)}',
+                        'key_evidence': '',
+                    }, ensure_ascii=False),
+                    'review_method': 'error',
+                    'rejection_reason': 'api_error',
+                    'status': STATUS_PENDING,
+                })
+                pending_count += 1
+                reviewed_count += 1
                 continue
         
         # 검수된 리포트 파일 저장
@@ -238,16 +396,18 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
         print("=" * 60)
         print(f"전체 공고: {len(report_data)}개")
         print(f"검수 완료: {reviewed_count}개")
-        print(f"승인: {approved_count}개")
-        print(f"거부: {rejected_count}개")
+        print(f"  ✅ 적합: {approved_count}개")
+        print(f"  ❌ 부적합: {rejected_count}개")
+        print(f"  ⏸️  미결(pending): {pending_count}개")
         if error_count > 0:
-            print(f"오류: {error_count}개")
-        
+            print(f"  ⚠️  오류: {error_count}개")
+
         return {
             'success': True,
             'reviewed_count': reviewed_count,
             'approved_count': approved_count,
             'rejected_count': rejected_count,
+            'pending_count': pending_count,
             'error_count': error_count,
             'report_path': str(filepath)
         }
@@ -265,28 +425,37 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
             'rejected_count': 0
         }
 
-def review_announcement_with_chatgpt(announcement: Dict) -> Dict:
+def review_announcement_with_chatgpt(
+    announcement: Dict,
+    attachment_text: str = '',
+) -> Dict:
     """
-    ChatGPT API를 사용하여 개별 공고 검수
-    
+    ChatGPT API를 사용하여 개별 공고 검수 (JSON 응답 구조화)
+
     Args:
         announcement: 공고 데이터 딕셔너리
-    
+        attachment_text: 첨부파일에서 추출한 텍스트 (없으면 빈 문자열)
+
     Returns:
-        검수 결과 딕셔너리
+        {
+            'approved': True | False | None,  # None = pending
+            'result': str,                    # GPT 원본 JSON 응답
+            'model': str,
+            'rejection_reason': str,          # 부적합/pending 사유 코드
+            'key_evidence': str,              # GPT가 근거로 든 원문 구절
+            'error': str,                     # 오류 메시지 (있을 경우)
+        }
     """
     try:
-        # OpenAI 클라이언트 초기화
         client = get_openai_client()
-        
-        # 검수 프롬프트 작성
+
         title = announcement.get('title', '')
         agency = announcement.get('agency', '')
         business_type = announcement.get('business_type', '')
         budget_amount = announcement.get('budget_amount')
         estimated_price = announcement.get('estimated_price')
         publish_date = announcement.get('publish_date', '')
-        
+
         # 예산 정보 포맷팅
         budget_info = ""
         if budget_amount:
@@ -296,61 +465,94 @@ def review_announcement_with_chatgpt(announcement: Dict) -> Dict:
                 budget_info += f"\n추정가격: {format_currency(estimated_price)}원"
             else:
                 budget_info = f"추정가격: {format_currency(estimated_price)}원"
-        
-        # EAP 검수 프롬프트 로드
+
+        # EAP 검수 프롬프트 로드 후 공고 정보 삽입
         base_prompt = load_eap_review_prompt()
-        
-        # 프롬프트에 공고 정보 삽입
         prompt = base_prompt.format(
             title=title,
             agency=agency,
             business_type=business_type,
             publish_date=publish_date,
             budget_info=budget_info if budget_info else "예산 정보 없음",
-            announcement_number=announcement.get('announcement_number', '')
+            announcement_number=announcement.get('announcement_number', ''),
+            attachment_text=attachment_text if attachment_text else '첨부파일 없음 (제목·기관·예산 정보만으로 판단)',
         )
-        
+
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=OPENAI_MODEL_REVIEW,
+            response_format={"type": "json_object"},
             messages=[
                 {
                     "role": "system",
-                    "content": "당신은 근로자지원프로그램(EAP) 전문가입니다. 공고가 EAP의 핵심 요소(심리 상담, 코칭, 근로자 지원 서비스 등)와 관련이 있는지 정확하게 판단합니다."
+                    "content": (
+                        "당신은 근로자지원프로그램(EAP) 전문가입니다. "
+                        "공고가 EAP의 핵심 요소(심리 상담, 코칭, 근로자 지원 서비스 등)와 관련이 있는지 판단합니다. "
+                        "반드시 JSON 형식으로만 응답하세요."
+                    )
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_tokens=400,
-            temperature=0.3
+            max_tokens=OPENAI_MAX_TOKENS_REVIEW,
+            temperature=OPENAI_TEMPERATURE_REVIEW,
         )
-        
+
         result_text = response.choices[0].message.content
-        
-        # 응답 파싱 (부적합을 먼저 체크)
-        result_lower = result_text.lower()
-        if '부적합' in result_text or '부적합합니다' in result_text or '부적합하다' in result_text:
-            approved = False
-        elif '적합' in result_text and '부적합' not in result_text:
+
+        # JSON 파싱
+        try:
+            parsed = json.loads(result_text)
+        except json.JSONDecodeError:
+            print(f"      ⚠️  GPT JSON 파싱 실패: {result_text[:100]}")
+            return {
+                'approved': None,
+                'result': result_text,
+                'model': OPENAI_MODEL_REVIEW,
+                'rejection_reason': 'parse_error',
+                'key_evidence': '',
+                'error': 'GPT 응답 JSON 파싱 실패',
+            }
+
+        decision = parsed.get('decision', '')
+        confidence = int(parsed.get('confidence', 0))
+        key_evidence = parsed.get('key_evidence', '')
+
+        # 결정 로직: confidence < 70 또는 '불명확' → pending
+        if decision == '적합' and confidence >= 70:
             approved = True
-        else:
-            # 기본값: 적합 여부가 명확하지 않으면 부적합으로 처리
+            rejection_reason = None
+        elif decision == '부적합' and confidence >= 70:
             approved = False
-        
+            rejection_reason = 'gpt_decision'
+        else:
+            # 신뢰도 미달 또는 '불명확' 응답
+            approved = None
+            rejection_reason = 'low_confidence' if confidence < 70 else 'gpt_uncertain'
+
         return {
             'approved': approved,
             'result': result_text,
-            'model': 'gpt-3.5-turbo'
+            'model': OPENAI_MODEL_REVIEW,
+            'rejection_reason': rejection_reason,
+            'key_evidence': key_evidence,
         }
-    
+
     except Exception as e:
-        print(f"ChatGPT 검수 중 오류: {str(e)}")
+        print(f"      ❌ ChatGPT 검수 중 오류: {str(e)}")
         return {
-            'approved': False,
-            'result': f'검수 중 오류 발생: {str(e)}',
+            'approved': None,
+            'result': json.dumps({
+                'decision': '불명확',
+                'confidence': 0,
+                'reason': f'API 오류: {str(e)}',
+                'key_evidence': '',
+            }, ensure_ascii=False),
+            'model': OPENAI_MODEL_REVIEW,
+            'rejection_reason': 'api_error',
+            'key_evidence': '',
             'error': str(e),
-            'model': 'gpt-3.5-turbo'
         }
 
 def format_currency(amount: int) -> str:

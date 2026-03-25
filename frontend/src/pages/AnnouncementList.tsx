@@ -18,6 +18,7 @@ import {
   MenuItem,
   Tabs,
   Tab,
+  Pagination,
 } from '@mui/material';
 import {
   Search,
@@ -28,12 +29,15 @@ import { Announcement } from '../types';
 import { formatBudget, formatDateShort } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 
+const ITEMS_PER_PAGE = 50;
+
 const AnnouncementList: React.FC = () => {
-  const { announcements, loading } = useAnnouncements({ limit: 100 });
+  const { announcements, loading } = useAnnouncements({ limit: 500 });
   const [searchTerm, setSearchTerm] = useState('');
   const [reviewFilter, setReviewFilter] = useState<string>('approved'); // 검수 결과 필터
   const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
   const filteredAnnouncements = announcements
@@ -68,6 +72,14 @@ const AnnouncementList: React.FC = () => {
       }
     });
 
+  // 페이지네이션 적용
+  const paginatedAnnouncements = useMemo(() => {
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    return filteredAnnouncements.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAnnouncements, page]);
+
+  const totalPages = Math.ceil(filteredAnnouncements.length / ITEMS_PER_PAGE);
+
   // 검수 결과별 공고 개수 계산
   const reviewCounts = useMemo(() => {
     return {
@@ -101,7 +113,7 @@ const AnnouncementList: React.FC = () => {
           <TextField
             placeholder="제목, 기관, 공고번호 검색..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -121,13 +133,13 @@ const AnnouncementList: React.FC = () => {
             정렬
           </Button>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleSortMenuClose}>
-            <MenuItem onClick={() => { setSortBy('publish_date'); handleSortMenuClose(); }}>
+            <MenuItem onClick={() => { setSortBy('publish_date'); setPage(1); handleSortMenuClose(); }}>
               게시일순
             </MenuItem>
-            <MenuItem onClick={() => { setSortBy('created_at'); handleSortMenuClose(); }}>
+            <MenuItem onClick={() => { setSortBy('created_at'); setPage(1); handleSortMenuClose(); }}>
               수집일순
             </MenuItem>
-            <MenuItem onClick={() => { setSortBy('budget'); handleSortMenuClose(); }}>
+            <MenuItem onClick={() => { setSortBy('budget'); setPage(1); handleSortMenuClose(); }}>
               예산순
             </MenuItem>
           </Menu>
@@ -137,7 +149,7 @@ const AnnouncementList: React.FC = () => {
       {/* 검수결과 필터 탭 */}
       <Tabs
         value={reviewFilter}
-        onChange={(e, newValue) => setReviewFilter(newValue)}
+        onChange={(e, newValue) => { setReviewFilter(newValue); setPage(1); }}
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
         <Tab label={`적합 (${reviewCounts.approved})`} value="approved" />
@@ -172,7 +184,7 @@ const AnnouncementList: React.FC = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredAnnouncements.map((announcement) => (
+              paginatedAnnouncements.map((announcement) => (
                 <TableRow 
                   key={announcement.id} 
                   hover
@@ -234,12 +246,22 @@ const AnnouncementList: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* 결과 카운트 */}
+      {/* 페이지네이션 */}
       {filteredAnnouncements.length > 0 && (
-        <Box mt={3} textAlign="center">
+        <Box mt={3} display="flex" flexDirection="column" alignItems="center" gap={1}>
           <Typography variant="body2" color="textSecondary">
-            총 {filteredAnnouncements.length}개의 공고가 표시됩니다.
+            {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filteredAnnouncements.length)} / 전체 {filteredAnnouncements.length}개
           </Typography>
+          {totalPages > 1 && (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_, value) => { setPage(value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              color="primary"
+              showFirstButton
+              showLastButton
+            />
+          )}
         </Box>
       )}
     </Box>
