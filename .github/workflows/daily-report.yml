@@ -1,0 +1,42 @@
+name: Daily Report (자동)
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 매일 00:00 UTC = 09:00 KST
+  workflow_dispatch:       # 수동 실행 버튼 (테스트용)
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 의존성 설치
+        run: pip install -r backend/requirements.txt
+
+      - name: Playwright 브라우저 설치
+        run: python -m playwright install chromium --with-deps
+
+      - name: Firebase 키 파일 생성
+        run: |
+          mkdir -p backend/config
+          echo '${{ secrets.FIREBASE_CREDENTIALS }}' > backend/config/firebase-credentials.json
+
+      - name: 일일 리포트 실행
+        run: python -m backend.entrypoints.daily_report --auto
+        env:
+          FIREBASE_CREDENTIALS_PATH: backend/config/firebase-credentials.json
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: C034EQD6W4W
+          SLACK_EAP_USERGROUP: S08SE5ZTPQD
+          FRONTEND_URL: https://eap-intern-roni.web.app
