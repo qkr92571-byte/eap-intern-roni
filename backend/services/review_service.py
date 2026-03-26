@@ -319,14 +319,11 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                     reviewed_count += 1
                     continue
 
-                # ── 2단계: 첨부파일 기반 GPT 심층 검수 ─────────────────────
+                # ── 2단계: GPT 심층 검수 (첨부파일 다운로드 생략) ─────────────────────
                 print(f"   [{idx}/{len(report_data)}] 🔍 [GPT검수] {title[:30]}...")
 
-                attachment_text, attach_method = fetch_attachment_text_for_review(
-                    announcement_number,
-                    title=title,
-                    created_at=announcement.get('created_at'),
-                )
+                # 첨부파일 다운로드 비활성화 (CI 환경에서 타임아웃 발생으로 제외)
+                attachment_text, attach_method = '', 'attachment_skipped'
 
                 review_result = review_announcement_with_chatgpt(announcement, attachment_text)
 
