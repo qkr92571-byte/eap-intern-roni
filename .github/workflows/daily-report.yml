@@ -6,13 +6,13 @@ on:
   workflow_dispatch:       # 수동 실행 버튼 (테스트용)
     inputs:
       slack_channel:
-        description: 'Slack 전송 채널'
+        description: 'Slack 전송 채널 | C071ZL69JQZ = 테스트 채널 / C034EQD6W4W = 공식 채널(EAP파트)'
         required: false
         default: 'C071ZL69JQZ'
         type: choice
         options:
-          - 'C071ZL69JQZ'   # 테스트 채널 (수동 실행 기본값)
-          - 'C034EQD6W4W'   # 공식 채널
+          - 'C071ZL69JQZ'
+          - 'C034EQD6W4W'
       skip_vpn:
         description: 'VPN 없이 실행 (롤백용)'
         required: false
