@@ -71,16 +71,23 @@ const useDashboard = (): DashboardData => {
         setAgencyTopFive(sorted);
 
         // 최근 7일 일별 수집 추이 (KST 기준)
+        const KST_OFFSET = 9 * 60 * 60 * 1000; // UTC+9
+        // UTC 시각에 +9h 해서 KST 날짜 문자열(YYYY-MM-DD) 추출
+        const toKstDateStr = (date: Date) =>
+          new Date(date.getTime() + KST_OFFSET).toISOString().slice(0, 10);
+
         const today = new Date();
         const trend: DailyCount[] = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
-          const dateStr = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '/').replace('.', '');
-          const isoDate = d.toISOString().slice(0, 10);
+          const kstDateStr = toKstDateStr(d);
+          // 표시용 날짜: KST 기준 MM/DD
+          const [, mm, dd] = kstDateStr.split('-');
+          const dateStr = `${mm}/${dd}`;
           const count = announcements.filter((a) => {
             if (!a.created_at) return false;
-            return new Date(a.created_at).toISOString().slice(0, 10) === isoDate;
+            return toKstDateStr(new Date(a.created_at)) === kstDateStr;
           }).length;
           trend.push({ date: dateStr, count });
         }

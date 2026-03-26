@@ -13,7 +13,7 @@ interface UseAnnouncementsOptions {
 }
 
 export const useAnnouncements = (options: UseAnnouncementsOptions = {}) => {
-  const { limit = 100, status, autoLoad = true } = options;
+  const { limit, status, autoLoad = true } = options;
   
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(false);
