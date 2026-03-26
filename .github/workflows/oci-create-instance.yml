@@ -1,0 +1,31 @@
+name: OCI ARM 인스턴스 자동 생성
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # 30분마다 생성 시도
+  workflow_dispatch:          # 수동 실행 버튼
+
+jobs:
+  create-instance:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OCI ARM 인스턴스 생성 시도
+        uses: hitrov/oci-arm-host-capacity@v0.3
+        env:
+          OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
+          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
+          OCI_KEY_FILE_CONTENT: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ap-chuncheon-1
+          OCI_AVAILABILITY_DOMAIN: dmxW:AP-CHUNCHEON-1-AD-1
+          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
+          OCI_SHAPE: VM.Standard.A1.Flex
+          OCI_OCPUS: 1
+          OCI_MEMORY_IN_GBS: 6
+          OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
