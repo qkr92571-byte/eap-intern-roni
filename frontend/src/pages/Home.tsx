@@ -91,7 +91,10 @@ const Home: React.FC = () => {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {statCards.map((card) => (
           <Grid item xs={6} sm={3} key={card.key}>
-            <Card sx={{ borderLeft: `4px solid ${card.color}`, height: '100%' }}>
+            <Card
+              sx={{ borderLeft: `4px solid ${card.color}`, height: '100%', cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
+              onClick={() => navigate(`/announcements?filter=${card.key === 'total' ? 'approved' : card.key}`)}
+            >
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{ color: card.color }}>{card.icon}</Box>
                 <Box>

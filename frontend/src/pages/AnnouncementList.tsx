@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -33,8 +33,9 @@ const ITEMS_PER_PAGE = 50;
 
 const AnnouncementList: React.FC = () => {
   const { announcements, loading } = useAnnouncements({ limit: 500 });
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
-  const [reviewFilter, setReviewFilter] = useState<string>('approved'); // 검수 결과 필터
+  const [reviewFilter, setReviewFilter] = useState<string>(searchParams.get('filter') || 'approved'); // 검수 결과 필터
   const [sortBy, setSortBy] = useState<'publish_date' | 'created_at' | 'budget'>('publish_date');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [page, setPage] = useState(1);
