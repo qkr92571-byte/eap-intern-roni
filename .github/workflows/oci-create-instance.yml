@@ -27,8 +27,8 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import oci
-          import oci.compute
-          import oci.compute.models
+          import oci.core
+          import oci.core.models
           import oci.exceptions
           import os
           import sys
@@ -41,22 +41,22 @@ jobs:
               "key_content": os.environ["OCI_PRIVATE_KEY"],
           }
 
-          compute = oci.compute.ComputeClient(config)
+          compute = oci.core.ComputeClient(config)
 
-          details = oci.compute.models.LaunchInstanceDetails(
+          details = oci.core.models.LaunchInstanceDetails(
               availability_domain = "dmxW:AP-CHUNCHEON-1-AD-1",
               compartment_id      = os.environ["OCI_TENANCY_ID"],
               display_name        = "eap-runner",
               shape               = "VM.Standard.A1.Flex",
-              shape_config        = oci.compute.models.LaunchInstanceShapeConfigDetails(
+              shape_config        = oci.core.models.LaunchInstanceShapeConfigDetails(
                   ocpus          = 1,
                   memory_in_gbs  = 6,
               ),
-              source_details      = oci.compute.models.InstanceSourceViaImageDetails(
+              source_details      = oci.core.models.InstanceSourceViaImageDetails(
                   image_id    = os.environ["OCI_IMAGE_ID"],
                   source_type = "image",
               ),
-              create_vnic_details = oci.compute.models.CreateVnicDetails(
+              create_vnic_details = oci.core.models.CreateVnicDetails(
                   subnet_id         = os.environ["OCI_SUBNET_ID"],
                   assign_public_ip  = True,
               ),
