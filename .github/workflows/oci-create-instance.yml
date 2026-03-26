@@ -34,9 +34,9 @@ jobs:
           import sys
 
           config = {
-              "user":        os.environ["OCI_USER_ID"],
-              "fingerprint": os.environ["OCI_FINGERPRINT"],
-              "tenancy":     os.environ["OCI_TENANCY_ID"],
+              "user":        os.environ["OCI_USER_ID"].strip(),
+              "fingerprint": os.environ["OCI_FINGERPRINT"].strip(),
+              "tenancy":     os.environ["OCI_TENANCY_ID"].strip(),
               "region":      "ap-chuncheon-1",
               "key_content": os.environ["OCI_PRIVATE_KEY"],
           }
@@ -45,7 +45,7 @@ jobs:
 
           details = oci.core.models.LaunchInstanceDetails(
               availability_domain = "dmxW:AP-CHUNCHEON-1-AD-1",
-              compartment_id      = os.environ["OCI_TENANCY_ID"],
+              compartment_id      = os.environ["OCI_TENANCY_ID"].strip(),
               display_name        = "eap-runner",
               shape               = "VM.Standard.A1.Flex",
               shape_config        = oci.core.models.LaunchInstanceShapeConfigDetails(
@@ -53,11 +53,11 @@ jobs:
                   memory_in_gbs  = 6,
               ),
               source_details      = oci.core.models.InstanceSourceViaImageDetails(
-                  image_id    = os.environ["OCI_IMAGE_ID"],
+                  image_id    = os.environ["OCI_IMAGE_ID"].strip(),
                   source_type = "image",
               ),
               create_vnic_details = oci.core.models.CreateVnicDetails(
-                  subnet_id         = os.environ["OCI_SUBNET_ID"],
+                  subnet_id         = os.environ["OCI_SUBNET_ID"].strip(),
                   assign_public_ip  = True,
               ),
               metadata = {
