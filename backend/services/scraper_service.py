@@ -41,6 +41,17 @@ def run_scraper(keywords=None, request_date=None):
     print("히스토리 파일에서 중복 체크용 공고번호 조회 중...")
     history_numbers = get_history_numbers(request_date)
     print(f"  히스토리에서 {len(history_numbers)}개의 공고번호 발견")
+
+    # 로컬 히스토리가 없는 경우(CI 환경 등) Firestore에서 보완
+    if len(history_numbers) == 0:
+        print("  히스토리 파일 없음 → Firestore에서 기존 공고번호 조회 중...")
+        try:
+            from services.firebase_service import get_firestore_announcement_numbers
+            firestore_numbers = get_firestore_announcement_numbers(days=60)
+            history_numbers = firestore_numbers
+            print(f"  Firestore에서 {len(history_numbers)}개의 공고번호 로드 완료")
+        except Exception as e:
+            print(f"  ⚠️  Firestore 조회 실패, 중복 체크 없이 진행: {e}")
     
     results = []
     # 신규 공고 개수 (히스토리 기준)

@@ -101,6 +101,36 @@ def save_announcement(announcement_data):
     doc_ref = db.collection('announcements').add(announcement_data)
     return doc_ref[1].id
 
+def get_firestore_announcement_numbers(days: int = 60) -> set:
+    """
+    Firestore에서 최근 N일 이내 공고번호 목록 조회 (CI 환경 중복 방지용)
+
+    Args:
+        days: 조회할 기간 (기본값: 60일)
+
+    Returns:
+        공고번호 set
+    """
+    from datetime import datetime, timedelta, timezone
+    db = get_db()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_str = cutoff.isoformat()
+        query = db.collection('announcements') \
+            .where('created_at', '>=', cutoff_str) \
+            .stream()
+        numbers = set()
+        for doc in query:
+            data = doc.to_dict()
+            num = data.get('announcement_number', '').strip()
+            if num:
+                numbers.add(num)
+        return numbers
+    except Exception as e:
+        print(f"  ⚠️  Firestore 공고번호 조회 실패 (로컬 히스토리만 사용): {e}")
+        return set()
+
+
 def check_duplicate_announcement(announcement_number: str) -> bool:
     """
     공고번호로 중복 체크
