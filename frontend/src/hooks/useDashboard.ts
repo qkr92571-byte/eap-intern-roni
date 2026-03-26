@@ -55,8 +55,8 @@ const useDashboard = (): DashboardData => {
         const pending = announcements.filter((a) => a.status === 'pending').length;
         setStats({ total, approved, rejected, pending });
 
-        // 최근 공고 5건 (이미 정렬되어 있음)
-        setRecentAnnouncements(announcements.slice(0, 5));
+        // 전체 공고 전달 (Home에서 필터링 후 5건 표시)
+        setRecentAnnouncements(announcements);
 
         // 기관별 그룹핑 → 상위 5개
         const agencyMap: Record<string, number> = {};

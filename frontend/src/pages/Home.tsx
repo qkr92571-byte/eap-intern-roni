@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,7 +13,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Chip,
   CircularProgress,
   Alert,
   Button,
@@ -61,6 +60,7 @@ const statCards = [
 const Home: React.FC = () => {
   const { stats, recentAnnouncements, agencyTopFive, dailyTrend, loading, error } = useDashboard();
   const navigate = useNavigate();
+  const [recentFilter, setRecentFilter] = useState<'approved' | 'rejected' | 'pending'>('approved');
 
   if (loading) {
     return (
@@ -153,56 +153,71 @@ const Home: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* 우: 최근 공고 5건 테이블 */}
+        {/* 우: 최근 공고 테이블 (필터별 5건) */}
         <Grid item xs={12} md={8}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-                최근 공고
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>제목</TableCell>
-                      <TableCell>발주기관</TableCell>
-                      <TableCell align="center">상태</TableCell>
-                      <TableCell>수집일</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentAnnouncements.map((a) => {
-                      const config = statusConfig[a.status] || statusConfig.pending;
-                      return (
-                        <TableRow
-                          key={a.id}
-                          hover
-                          sx={{ cursor: 'pointer' }}
-                          onClick={() => navigate(`/announcements/${a.id}`)}
-                        >
-                          <TableCell sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {a.title}
-                          </TableCell>
-                          <TableCell>{a.agency}</TableCell>
-                          <TableCell align="center">
-                            <Chip label={config.label} color={config.color} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            {a.created_at ? new Date(a.created_at).toLocaleDateString('ko-KR') : '-'}
-                          </TableCell>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>최근 공고</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  {(['approved', 'rejected', 'pending'] as const).map((f) => {
+                    const cfg = statusConfig[f];
+                    return (
+                      <Button
+                        key={f}
+                        size="small"
+                        variant={recentFilter === f ? 'contained' : 'outlined'}
+                        color={cfg.color}
+                        onClick={() => setRecentFilter(f)}
+                        sx={{ minWidth: 0, px: 1.2, py: 0.3, fontSize: 12 }}
+                      >
+                        {cfg.label}
+                      </Button>
+                    );
+                  })}
+                </Box>
+              </Box>
+              {(() => {
+                const filtered = recentAnnouncements.filter((a) => a.status === recentFilter).slice(0, 5);
+                return (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>제목</TableCell>
+                          <TableCell>발주기관</TableCell>
+                          <TableCell>수집일</TableCell>
                         </TableRow>
-                      );
-                    })}
-                    {recentAnnouncements.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center">공고가 없습니다.</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {filtered.map((a) => (
+                          <TableRow
+                            key={a.id}
+                            hover
+                            sx={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/announcements/${a.id}`)}
+                          >
+                            <TableCell sx={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {a.title}
+                            </TableCell>
+                            <TableCell>{a.agency}</TableCell>
+                            <TableCell>
+                              {a.created_at ? new Date(a.created_at).toLocaleDateString('ko-KR') : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {filtered.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} align="center">공고가 없습니다.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                );
+              })()}
               <Box sx={{ mt: 1, textAlign: 'right' }}>
-                <Button size="small" onClick={() => navigate('/announcements')}>
+                <Button size="small" onClick={() => navigate(`/announcements?filter=${recentFilter}`)}>
                   전체 보기 →
                 </Button>
               </Box>
