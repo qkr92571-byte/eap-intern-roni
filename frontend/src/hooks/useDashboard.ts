@@ -39,7 +39,7 @@ const useDashboard = (): DashboardData => {
         setLoading(true);
         setError(null);
 
-        const response = await getAnnouncements({ limit: 500 });
+        const response = await getAnnouncements();
 
         if (!response.success || !response.data) {
           setError(response.error || '데이터를 불러오는데 실패했습니다.');

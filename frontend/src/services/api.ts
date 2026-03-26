@@ -17,7 +17,9 @@ const getAnnouncementsFromFirestore = async (params?: {
     // display_status=20(노출)인 것만 서버에서 필터링 (삭제된 공고 제외)
     // 정렬은 인덱스 문제 방지를 위해 클라이언트에서 수행
     const snapshot = await getDocs(
-      query(q, where('display_status', '==', 20), fsLimit(limit ?? 500))
+      limit
+        ? query(q, where('display_status', '==', 20), fsLimit(limit))
+        : query(q, where('display_status', '==', 20))
     );
 
     const announcements: Announcement[] = [];

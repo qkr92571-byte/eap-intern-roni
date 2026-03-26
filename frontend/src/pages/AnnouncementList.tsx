@@ -32,7 +32,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 const ITEMS_PER_PAGE = 50;
 
 const AnnouncementList: React.FC = () => {
-  const { announcements, loading } = useAnnouncements({ limit: 500 });
+  const { announcements, loading } = useAnnouncements();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [reviewFilter, setReviewFilter] = useState<string>(searchParams.get('filter') || 'approved'); // 검수 결과 필터
