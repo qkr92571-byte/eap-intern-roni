@@ -92,8 +92,8 @@ const Home: React.FC = () => {
         {statCards.map((card) => (
           <Grid item xs={6} sm={3} key={card.key}>
             <Card
-              sx={{ borderLeft: `4px solid ${card.color}`, height: '100%', cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
-              onClick={() => navigate(`/announcements?filter=${card.key === 'total' ? 'approved' : card.key}`)}
+              sx={{ borderLeft: `4px solid ${card.color}`, height: '100%', cursor: card.key !== 'total' ? 'pointer' : 'default', '&:hover': card.key !== 'total' ? { boxShadow: 4 } : {} }}
+              onClick={() => { if (card.key !== 'total') setRecentFilter(card.key as 'approved' | 'rejected' | 'pending'); }}
             >
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{ color: card.color }}>{card.icon}</Box>
