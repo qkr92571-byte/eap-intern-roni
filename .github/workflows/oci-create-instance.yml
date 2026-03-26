@@ -23,22 +23,17 @@ jobs:
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
         run: |
           mkdir -p ~/.oci
-          echo "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          printf '%s' "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
-          cat > ~/.oci/config << EOF
-          [DEFAULT]
-          user=$OCI_USER_ID
-          fingerprint=$OCI_FINGERPRINT
-          tenancy=$OCI_TENANCY_ID
-          region=ap-chuncheon-1
-          key_file=/home/runner/.oci/oci_api_key.pem
-          EOF
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=ap-chuncheon-1\nkey_file=/home/runner/.oci/oci_api_key.pem\n' \
+            "$OCI_USER_ID" "$OCI_FINGERPRINT" "$OCI_TENANCY_ID" > ~/.oci/config
           chmod 600 ~/.oci/config
+          cat ~/.oci/config
 
       - name: SSH 퍼블릭 키 파일 생성
         env:
           OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
-        run: echo "$OCI_SSH_PUBLIC_KEY" > /tmp/ssh_key.pub
+        run: printf '%s' "$OCI_SSH_PUBLIC_KEY" > /tmp/ssh_key.pub
 
       - name: ARM 인스턴스 생성 시도
         env:
@@ -50,7 +45,7 @@ jobs:
             --availability-domain "dmxW:AP-CHUNCHEON-1-AD-1" \
             --compartment-id "$OCI_TENANCY_ID" \
             --shape "VM.Standard.A1.Flex" \
-            --shape-config '{"ocpus": 1, "memoryInGBs": 6}' \
+            --shape-config '{"ocpus": 1, "memory_in_gbs": 6}' \
             --image-id "$OCI_IMAGE_ID" \
             --subnet-id "$OCI_SUBNET_ID" \
             --ssh-authorized-keys-file /tmp/ssh_key.pub \
