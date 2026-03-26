@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: OCI ARM 인스턴스 생성 시도
-        uses: hitrov/oci-arm-host-capacity@v0.3
+        uses: hitrov/oci-arm-host-capacity@main
         env:
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
