@@ -109,7 +109,9 @@ def run_scraper(keywords=None, request_date=None):
             # 1. 나라장터 메인 페이지 접속
             print("\n[1단계] 나라장터 메인 페이지 접속 중...")
             url = "https://www.g2b.go.kr/"
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            pw_wait = os.getenv('PLAYWRIGHT_WAIT_UNTIL', 'networkidle')
+            pw_timeout = int(os.getenv('PLAYWRIGHT_TIMEOUT', '30000'))
+            page.goto(url, wait_until=pw_wait, timeout=pw_timeout)
             time.sleep(3)
             print("  ✅ 메인 페이지 접속 완료")
             
