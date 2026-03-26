@@ -27,6 +27,9 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import oci
+          import oci.compute
+          import oci.compute.models
+          import oci.exceptions
           import os
           import sys
 
