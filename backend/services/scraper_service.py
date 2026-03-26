@@ -90,10 +90,17 @@ def run_scraper(keywords=None, request_date=None):
                 )
                 print("  ✅ Chromium 브라우저로 실행 (크래시 방지 옵션 적용)")
             
-            context = browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
+            # CI 환경에서 VPN 프록시 명시적 주입 (PLAYWRIGHT_PROXY_SERVER 환경변수)
+            proxy_server = os.getenv('PLAYWRIGHT_PROXY_SERVER')
+            context_options = {
+                'viewport': {'width': 1920, 'height': 1080},
+                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+            if proxy_server:
+                context_options['proxy'] = {'server': proxy_server}
+                print(f"  ✅ 프록시 설정: {proxy_server}")
+
+            context = browser.new_context(**context_options)
             print("  ✅ 브라우저 컨텍스트 생성 완료")
             
             page = context.new_page()

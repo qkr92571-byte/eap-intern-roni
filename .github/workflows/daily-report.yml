@@ -108,6 +108,14 @@ jobs:
             exit 1
           fi
 
+      - name: SOCKS5 로컬 프록시 시작 (Playwright VPN 라우팅용)
+        if: ${{ github.event.inputs.skip_vpn != 'true' }}
+        run: |
+          pip install pproxy -q
+          nohup python3 -m pproxy -l socks5://:1080 > /tmp/pproxy.log 2>&1 &
+          sleep 3
+          echo "✅ SOCKS5 프록시 시작 (포트 1080)"
+
       - name: Firebase 키 파일 생성
         run: |
           mkdir -p backend/config
@@ -117,6 +125,7 @@ jobs:
         run: python -m backend.entrypoints.daily_report --auto
         env:
           FIREBASE_CREDENTIALS_PATH: backend/config/firebase-credentials.json
+          PLAYWRIGHT_PROXY_SERVER: ${{ github.event.inputs.skip_vpn != 'true' && 'socks5://127.0.0.1:1080' || '' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL_ID: ${{ github.event.inputs.slack_channel || 'C034EQD6W4W' }}
