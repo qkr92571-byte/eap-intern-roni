@@ -122,8 +122,9 @@ jobs:
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > backend/config/firebase-credentials.json
 
       - name: 일일 리포트 실행
-        run: python -m backend.entrypoints.daily_report --auto
+        run: python -u -m backend.entrypoints.daily_report --auto
         env:
+          PYTHONUNBUFFERED: "1"
           FIREBASE_CREDENTIALS_PATH: backend/config/firebase-credentials.json
           PLAYWRIGHT_PROXY_SERVER: ${{ github.event.inputs.skip_vpn != 'true' && 'socks5://127.0.0.1:1080' || '' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
