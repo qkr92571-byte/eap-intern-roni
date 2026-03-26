@@ -114,7 +114,7 @@ def run_scraper(keywords=None, request_date=None):
             page.goto(url, wait_until=pw_wait, timeout=pw_timeout)
             time.sleep(3)
             print("  ✅ 메인 페이지 접속 완료")
-            
+
             # 1-1. 팝업 닫기
             print("\n[1-1단계] 팝업 닫기 중...")
             popup_selector = 'div[role="dialog"][aria-modal="true"]'
@@ -127,15 +127,27 @@ def run_scraper(keywords=None, request_date=None):
                     except:
                         page.evaluate("() => { const btn = document.querySelector('.w2window_close'); if (btn) btn.click(); }")
                         time.sleep(1)
-            
+
             # 2. "입찰" 메뉴 클릭
             print("\n[2단계] '입찰' 메뉴 클릭 중...")
             menu_bid_id = 'mf_wfm_gnb_wfm_gnbMenu_wq_uuid_567'
-            
+
             # 페이지 상태 확인
             if page.is_closed():
                 raise Exception("페이지가 메뉴 클릭 전에 닫혔습니다")
-            
+
+            # GNB 메뉴가 JS로 렌더링될 때까지 대기 (wait_until="load"는 DOM만 기다리므로 추가 대기 필요)
+            try:
+                page.wait_for_selector(f'#{menu_bid_id}', timeout=15000)
+                print(f"  ✅ 입찰 메뉴 요소 로드 확인")
+            except Exception:
+                print("  ⚠️  15초 대기 후에도 입찰 메뉴 미발견, 텍스트 기반으로 재시도...")
+                # 텍스트 "입찰"을 포함하는 GNB 링크/버튼으로 폴백
+                try:
+                    page.wait_for_selector('text=입찰', timeout=5000)
+                except Exception:
+                    pass
+
             # 메뉴 요소 존재 확인
             menu_exists = page.evaluate(f"""
                 () => {{
@@ -143,7 +155,7 @@ def run_scraper(keywords=None, request_date=None):
                     return el !== null;
                 }}
             """)
-            
+
             if not menu_exists:
                 print("  ⚠️  입찰 메뉴 요소를 찾을 수 없습니다. 페이지 구조가 변경되었을 수 있습니다.")
                 # 현재 URL 확인
@@ -176,11 +188,18 @@ def run_scraper(keywords=None, request_date=None):
             # 3. "입찰공고목록" 서브메뉴 클릭
             print("\n[3단계] '입찰공고목록' 서브메뉴 클릭 중...")
             menu_bid_list_id = 'mf_wfm_gnb_wfm_gnbMenu_genDepth1_1_genDepth2_0_genDepth3_0_btn_menuLvl3'
-            
+
             # 페이지 상태 확인
             if page.is_closed():
                 raise Exception("페이지가 서브메뉴 클릭 전에 닫혔습니다")
-            
+
+            # 입찰 메뉴 클릭 후 서브메뉴가 펼쳐질 때까지 대기
+            try:
+                page.wait_for_selector(f'#{menu_bid_list_id}', timeout=10000)
+                print(f"  ✅ 서브메뉴 요소 로드 확인")
+            except Exception:
+                print("  ⚠️  서브메뉴 대기 시간 초과, 계속 진행...")
+
             # 서브메뉴 요소 확인 및 클릭 (다른 프로젝트 방식 적용)
             # JavaScript로 먼저 요소 존재 확인
             menu_info = page.evaluate(f"""
@@ -198,13 +217,16 @@ def run_scraper(keywords=None, request_date=None):
                 }}
             """)
             
+            # 클릭 전 URL 저장 (메뉴 발견 여부와 무관하게 미리 초기화)
+            url_before = page.url
+
             if menu_info and menu_info.get('exists'):
                 print(f"  ✅ 입찰공고목록 메뉴 발견!")
                 print(f"      태그: {menu_info.get('tagName', 'N/A')}")
                 print(f"      텍스트: {menu_info.get('text', 'N/A')[:50]}")
                 print(f"      표시 여부: {menu_info.get('visible', False)}")
-                
-                # 클릭 전 URL 저장
+
+                # 클릭 전 URL (이미 위에서 설정됨)
                 url_before = page.url
                 print(f"  📍 클릭 전 URL: {url_before}")
                 
