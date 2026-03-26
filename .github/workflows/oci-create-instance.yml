@@ -12,20 +12,59 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - uses: actions/checkout@v4
+      - name: OCI CLI 설치
+        run: pip install oci-cli
 
-      - name: OCI ARM 인스턴스 생성 시도
-        uses: hitrov/oci-arm-host-capacity@main
+      - name: OCI 설정 파일 생성
         env:
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
-          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
-          OCI_KEY_FILE_CONTENT: ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_REGION: ap-chuncheon-1
-          OCI_AVAILABILITY_DOMAIN: dmxW:AP-CHUNCHEON-1-AD-1
+          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=$OCI_USER_ID
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY_ID
+          region=ap-chuncheon-1
+          key_file=/home/runner/.oci/oci_api_key.pem
+          EOF
+
+      - name: SSH 퍼블릭 키 파일 생성
+        env:
+          OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+        run: echo "$OCI_SSH_PUBLIC_KEY" > /tmp/ssh_key.pub
+
+      - name: ARM 인스턴스 생성 시도
+        env:
+          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
-          OCI_SHAPE: VM.Standard.A1.Flex
-          OCI_OCPUS: 1
-          OCI_MEMORY_IN_GBS: 6
-          OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+        run: |
+          RESULT=$(oci compute instance launch \
+            --availability-domain "dmxW:AP-CHUNCHEON-1-AD-1" \
+            --compartment-id "$OCI_TENANCY_ID" \
+            --shape "VM.Standard.A1.Flex" \
+            --shape-config '{"ocpus": 1, "memoryInGBs": 6}' \
+            --image-id "$OCI_IMAGE_ID" \
+            --subnet-id "$OCI_SUBNET_ID" \
+            --ssh-authorized-keys-file /tmp/ssh_key.pub \
+            --assign-public-ip true \
+            --display-name "eap-runner" 2>&1) || true
+
+          echo "$RESULT"
+
+          if echo "$RESULT" | grep -qi "Out of host capacity\|Out of capacity"; then
+            echo "⚠️  용량 부족 - 30분 후 자동 재시도"
+            exit 0
+          elif echo "$RESULT" | grep -q '"id"'; then
+            echo "✅ 인스턴스 생성 성공!"
+            exit 0
+          else
+            echo "❌ 기타 오류 발생"
+            exit 1
+          fi
