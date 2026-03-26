@@ -33,6 +33,7 @@ jobs:
           region=ap-chuncheon-1
           key_file=/home/runner/.oci/oci_api_key.pem
           EOF
+          chmod 600 ~/.oci/config
 
       - name: SSH 퍼블릭 키 파일 생성
         env:
@@ -45,15 +46,15 @@ jobs:
           OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
           OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
         run: |
+          VNIC_DETAILS="{\"subnetId\": \"$OCI_SUBNET_ID\", \"assignPublicIp\": true}"
           RESULT=$(oci compute instance launch \
             --availability-domain "dmxW:AP-CHUNCHEON-1-AD-1" \
             --compartment-id "$OCI_TENANCY_ID" \
             --shape "VM.Standard.A1.Flex" \
             --shape-config '{"ocpus": 1, "memoryInGBs": 6}' \
             --image-id "$OCI_IMAGE_ID" \
-            --subnet-id "$OCI_SUBNET_ID" \
+            --create-vnic-details "$VNIC_DETAILS" \
             --ssh-authorized-keys-file /tmp/ssh_key.pub \
-            --assign-public-ip true \
             --display-name "eap-runner" 2>&1) || true
 
           echo "$RESULT"
