@@ -125,6 +125,7 @@ jobs:
         run: python -u -m backend.entrypoints.daily_report --auto
         env:
           PYTHONUNBUFFERED: "1"
+          AUTO_CONFIRM: "1"
           FIREBASE_CREDENTIALS_PATH: backend/config/firebase-credentials.json
           PLAYWRIGHT_PROXY_SERVER: ${{ github.event.inputs.skip_vpn != 'true' && 'socks5://127.0.0.1:1080' || '' }}
           PLAYWRIGHT_WAIT_UNTIL: "load"
