@@ -154,6 +154,7 @@ const AnnouncementList: React.FC = () => {
       >
         <Tab label={`적합 (${reviewCounts.approved})`} value="approved" />
         <Tab label={`부적합 (${reviewCounts.rejected})`} value="rejected" />
+        <Tab label={`미검수 (${reviewCounts.pending})`} value="pending" />
       </Tabs>
 
       {/* 테이블 뷰 */}
