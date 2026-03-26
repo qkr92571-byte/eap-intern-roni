@@ -69,16 +69,23 @@ jobs:
             printf '%s' "$CONFIG_B64" | base64 -d > /tmp/korea.ovpn 2>/dev/null \
               || { echo "  base64 디코딩 실패, 건너뜀"; continue; }
 
+            # 모든 트래픽을 VPN으로 강제 라우팅
+            echo "redirect-gateway def1 bypass-dhcp" >> /tmp/korea.ovpn
+
             sudo openvpn --config /tmp/korea.ovpn \
               --auth-user-pass /tmp/vpn_creds.txt \
               --daemon --log /tmp/vpn.log
-            sleep 15
+            sleep 20
 
+            # 한국 IP 여부 확인
+            COUNTRY=$(curl -s --max-time 10 https://ipinfo.io/country || echo "")
             CURRENT_IP=$(curl -s --max-time 10 ifconfig.me || echo "")
-            if [ -n "$CURRENT_IP" ]; then
-              echo "✅ VPN 연결 성공: $CURRENT_IP (서버: $IP)"
+            if [ "$COUNTRY" = "KR" ]; then
+              echo "✅ 한국 IP 확인: $CURRENT_IP (서버: $IP)"
               CONNECTED=true
               break
+            else
+              echo "⚠️ 한국 IP 아님 (현재: $COUNTRY / $CURRENT_IP), 다음 서버 시도..."
             fi
 
             echo "⚠️ $IP 연결 실패, 다음 서버 시도..."
