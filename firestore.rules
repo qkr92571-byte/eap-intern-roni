@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 인증 여부 확인
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // admin 역할 확인 (자신의 users 문서 조회)
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // users 컬렉션
+    match /users/{uid} {
+      // 자신의 프로필 읽기/생성
+      allow read, create: if isAuthenticated() && request.auth.uid == uid;
+      // admin은 전체 사용자 읽기/수정 가능
+      allow read, write: if isAdmin();
+    }
+
+    // announcements 컬렉션
+    match /announcements/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // settings 컬렉션 (프롬프트 등)
+    match /settings/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // competitor_awards 컬렉션
+    match /competitor_awards/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
