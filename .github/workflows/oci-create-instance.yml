@@ -1,9 +1,7 @@
 name: OCI ARM 인스턴스 자동 생성
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # 30분마다 생성 시도
-  workflow_dispatch:          # 수동 실행 버튼
+  workflow_dispatch:          # 수동 실행 버튼 (자동 스케줄 비활성화)
 
 jobs:
   create-instance:
