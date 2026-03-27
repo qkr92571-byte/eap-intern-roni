@@ -58,4 +58,12 @@ export interface Stats {
   rejected: number;
 }
 
+export interface UserProfile {
+  uid: string;
+  email: string;
+  role: 'admin' | 'default';
+  approved: boolean;
+  created_at: string;
+}
+
 

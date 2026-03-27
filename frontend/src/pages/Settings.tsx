@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -9,9 +9,21 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Chip,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
+import CheckIcon from '@mui/icons-material/Check';
 import { getPrompt, savePrompt, getPromptMetadata } from '../services/promptApi';
+import { getAllUsers, approveUser, updateUserRole } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { UserProfile } from '../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -36,7 +48,12 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const Settings: React.FC = () => {
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.role === 'admin';
+
   const [tabValue, setTabValue] = useState(0);
+
+  // 프롬프트 탭 상태
   const [promptContent, setPromptContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,9 +61,55 @@ const Settings: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [metadata, setMetadata] = useState<{ updated_at?: string; updated_by?: string } | null>(null);
 
+  // 사용자 관리 탭 상태
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   useEffect(() => {
     loadPrompt();
   }, []);
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    setUsersError(null);
+    const response = await getAllUsers();
+    if (response.success && response.data) {
+      setUsers(response.data);
+    } else {
+      setUsersError(response.error || '사용자 목록을 불러오는데 실패했습니다.');
+    }
+    setUsersLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin && tabValue === 1) {
+      loadUsers();
+    }
+  }, [isAdmin, tabValue, loadUsers]);
+
+  const handleApprove = async (uid: string) => {
+    setActionLoading(uid);
+    const response = await approveUser(uid);
+    if (response.success) {
+      setUsers((prev) => prev.map((u) => u.uid === uid ? { ...u, approved: true } : u));
+    } else {
+      setUsersError(response.error || '승인에 실패했습니다.');
+    }
+    setActionLoading(null);
+  };
+
+  const handleRoleChange = async (uid: string, role: 'admin' | 'default') => {
+    setActionLoading(uid + '_role');
+    const response = await updateUserRole(uid, role);
+    if (response.success) {
+      setUsers((prev) => prev.map((u) => u.uid === uid ? { ...u, role } : u));
+    } else {
+      setUsersError(response.error || '역할 변경에 실패했습니다.');
+    }
+    setActionLoading(null);
+  };
 
   const loadPrompt = async () => {
     try {
@@ -114,6 +177,7 @@ const Settings: React.FC = () => {
       <Paper sx={{ p: 3 }}>
         <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
           <Tab label="프롬프트" />
+          {isAdmin && <Tab label="사용자 관리" />}
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -184,6 +248,94 @@ const Settings: React.FC = () => {
             </Box>
           </Box>
         </TabPanel>
+
+        {/* 사용자 관리 탭 (admin 전용) */}
+        {isAdmin && (
+          <TabPanel value={tabValue} index={1}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">사용자 관리</Typography>
+              <Button variant="outlined" size="small" onClick={loadUsers} disabled={usersLoading}>
+                새로고침
+              </Button>
+            </Box>
+
+            {usersError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUsersError(null)}>
+                {usersError}
+              </Alert>
+            )}
+
+            {usersLoading ? (
+              <Box display="flex" justifyContent="center" py={4}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>이메일</TableCell>
+                    <TableCell>가입일</TableCell>
+                    <TableCell>승인 상태</TableCell>
+                    <TableCell>권한</TableCell>
+                    <TableCell>액션</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.uid}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString('ko-KR')}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.approved ? '승인' : '대기'}
+                          color={user.approved ? 'success' : 'warning'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={user.role}
+                          size="small"
+                          disabled={actionLoading === user.uid + '_role'}
+                          onChange={(e) =>
+                            handleRoleChange(user.uid, e.target.value as 'admin' | 'default')
+                          }
+                          sx={{ minWidth: 90, fontSize: '0.875rem' }}
+                        >
+                          <MenuItem value="default">default</MenuItem>
+                          <MenuItem value="admin">admin</MenuItem>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        {!user.approved && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            color="success"
+                            startIcon={<CheckIcon />}
+                            disabled={actionLoading === user.uid}
+                            onClick={() => handleApprove(user.uid)}
+                          >
+                            승인
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {users.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        등록된 사용자가 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </TabPanel>
+        )}
       </Paper>
     </Box>
   );

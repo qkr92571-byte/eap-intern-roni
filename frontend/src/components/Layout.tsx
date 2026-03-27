@@ -13,6 +13,8 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
+  Chip,
+  Tooltip,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -22,7 +24,9 @@ import {
   Article as ArticleIcon,
   TrendingUp as TrendingUpIcon,
   Settings as SettingsIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 const DRAWER_WIDTH = 192; // 240px의 80%
 
@@ -36,6 +40,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { userProfile, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const menuItems = [
     { label: '홈', path: '/', icon: <DashboardIcon /> },
@@ -143,6 +153,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             인턴 로니
           </Typography>
+          {/* 사용자 정보 + 로그아웃 */}
+          <Typography variant="body2" sx={{ mr: 1, opacity: 0.85 }}>
+            {userProfile?.email}
+          </Typography>
+          {userProfile?.role === 'admin' && (
+            <Chip label="admin" size="small" sx={{ mr: 1.5, bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 'bold' }} />
+          )}
+          <Tooltip title="로그아웃">
+            <IconButton color="inherit" onClick={handleLogout} size="small">
+              <LogoutIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
       

@@ -1,6 +1,6 @@
-import { collection, doc, getDoc, getDocs, limit as fsLimit, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit as fsLimit, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Announcement, ApiResponse } from '../types';
+import { Announcement, ApiResponse, UserProfile } from '../types';
 
 /**
  * Firestore에서 공고 목록 조회
@@ -246,5 +246,96 @@ export const getCompetitorAwards = async (params?: {
   limit?: number;
 }): Promise<ApiResponse<any[]>> => {
   return getCompetitorAwardsFromFirestore(params);
+};
+
+/**
+ * 회원가입 시 Firestore users 컬렉션에 사용자 프로필 생성
+ * - 기본값: role='default', approved=false
+ */
+export const createUserProfile = async (
+  uid: string,
+  email: string
+): Promise<ApiResponse<void>> => {
+  try {
+    const ref = doc(db, 'users', uid);
+    await setDoc(ref, {
+      uid,
+      email,
+      role: 'default',
+      approved: false,
+      created_at: new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('사용자 프로필 생성 실패:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Firestore에서 사용자 프로필 조회
+ */
+export const getUserProfile = async (uid: string): Promise<ApiResponse<UserProfile>> => {
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      return { success: false, error: '사용자 프로필을 찾을 수 없습니다.' };
+    }
+    return { success: true, data: snap.data() as UserProfile };
+  } catch (error: any) {
+    console.error('사용자 프로필 조회 실패:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 전체 사용자 목록 조회 (admin 전용)
+ */
+export const getAllUsers = async (): Promise<ApiResponse<UserProfile[]>> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users'));
+    const users: UserProfile[] = [];
+    snapshot.forEach((docSnap) => {
+      users.push(docSnap.data() as UserProfile);
+    });
+    // 가입일 기준 최신순 정렬
+    users.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return { success: true, data: users };
+  } catch (error: any) {
+    console.error('사용자 목록 조회 실패:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 사용자 승인 처리 (admin 전용)
+ */
+export const approveUser = async (uid: string): Promise<ApiResponse<void>> => {
+  try {
+    const ref = doc(db, 'users', uid);
+    await updateDoc(ref, { approved: true });
+    return { success: true };
+  } catch (error: any) {
+    console.error('사용자 승인 실패:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 사용자 역할 변경 (admin 전용)
+ */
+export const updateUserRole = async (
+  uid: string,
+  role: 'admin' | 'default'
+): Promise<ApiResponse<void>> => {
+  try {
+    const ref = doc(db, 'users', uid);
+    await updateDoc(ref, { role });
+    return { success: true };
+  } catch (error: any) {
+    console.error('사용자 역할 변경 실패:', error);
+    return { success: false, error: error.message };
+  }
 };
 

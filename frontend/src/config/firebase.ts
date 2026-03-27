@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 // Firebase 설정은 환경 변수에서 가져옵니다
 const firebaseConfig = {
@@ -16,6 +17,10 @@ const app = initializeApp(firebaseConfig);
 
 // Firestore 인스턴스
 export const db = getFirestore(app);
+
+// Firebase Auth 인스턴스
+export const auth = getAuth(app);
+
 export default app;
 
 
