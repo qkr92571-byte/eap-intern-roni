@@ -53,7 +53,7 @@ const AnnouncementList: React.FC = () => {
         if (reviewFilter === 'all') return true;
         if (reviewFilter === 'approved') return announcement.status === 'approved';
         if (reviewFilter === 'rejected') return announcement.status === 'rejected';
-        if (reviewFilter === 'pending') return announcement.status === 'pending' || !announcement.reviewed;
+        if (reviewFilter === 'pending') return false;
         return true;
       })();
       
@@ -87,7 +87,6 @@ const AnnouncementList: React.FC = () => {
       all: announcements.length,
       approved: announcements.filter(a => a.status === 'approved').length,
       rejected: announcements.filter(a => a.status === 'rejected').length,
-      pending: announcements.filter(a => a.status === 'pending' || !a.reviewed).length,
     };
   }, [announcements]);
 
@@ -155,7 +154,6 @@ const AnnouncementList: React.FC = () => {
       >
         <Tab label={`적합 (${reviewCounts.approved})`} value="approved" />
         <Tab label={`부적합 (${reviewCounts.rejected})`} value="rejected" />
-        <Tab label={`미검수 (${reviewCounts.pending})`} value="pending" />
       </Tabs>
 
       {/* 테이블 뷰 */}
@@ -226,15 +224,11 @@ const AnnouncementList: React.FC = () => {
                   </TableCell>
                   <TableCell>{announcement.deadline || '-'}</TableCell>
                   <TableCell>
-                    {announcement.reviewed ? (
-                      <Chip
-                        label={announcement.status === 'approved' ? '적합' : announcement.status === 'rejected' ? '부적합' : '미검수'}
-                        color={announcement.status === 'approved' ? 'success' : announcement.status === 'rejected' ? 'error' : 'default'}
-                        size="small"
-                      />
-                    ) : (
-                      <Chip label="미검수" color="default" size="small" variant="outlined" />
-                    )}
+                    <Chip
+                      label={announcement.status === 'approved' ? '적합' : '부적합'}
+                      color={announcement.status === 'approved' ? 'success' : 'error'}
+                      size="small"
+                    />
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="textSecondary">

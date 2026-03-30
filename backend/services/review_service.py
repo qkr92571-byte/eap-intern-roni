@@ -337,13 +337,7 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                     'review_method': review_method,
                 })
 
-                if review_result.get('error') or review_result.get('approved') is None:
-                    # API 오류, JSON 파싱 실패, 불명확 → pending
-                    announcement['status'] = STATUS_PENDING
-                    announcement['rejection_reason'] = review_result.get('rejection_reason', 'api_error')
-                    status_icon = '⏸️ '
-                    pending_count += 1
-                elif review_result.get('approved') is True:
+                if review_result.get('approved') is True:
                     announcement['status'] = STATUS_APPROVED
                     status_icon = '✅'
                     approved_count += 1
@@ -370,9 +364,9 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                     }, ensure_ascii=False),
                     'review_method': 'error',
                     'rejection_reason': 'api_error',
-                    'status': STATUS_PENDING,
+                    'status': STATUS_REJECTED,
                 })
-                pending_count += 1
+                rejected_count += 1
                 reviewed_count += 1
                 continue
         
@@ -395,7 +389,6 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
         print(f"검수 완료: {reviewed_count}개")
         print(f"  ✅ 적합: {approved_count}개")
         print(f"  ❌ 부적합: {rejected_count}개")
-        print(f"  ⏸️  미결(pending): {pending_count}개")
         if error_count > 0:
             print(f"  ⚠️  오류: {error_count}개")
 
@@ -504,7 +497,7 @@ def review_announcement_with_chatgpt(
         except json.JSONDecodeError:
             print(f"      ⚠️  GPT JSON 파싱 실패: {result_text[:100]}")
             return {
-                'approved': None,
+                'approved': False,
                 'result': result_text,
                 'model': OPENAI_MODEL_REVIEW,
                 'rejection_reason': 'parse_error',
@@ -516,17 +509,19 @@ def review_announcement_with_chatgpt(
         confidence = int(parsed.get('confidence', 0))
         key_evidence = parsed.get('key_evidence', '')
 
-        # 결정 로직: confidence < 70 또는 '불명확' → pending
+        # 결정 로직: confidence < 70 또는 '불명확' → 부적합 처리
         if decision == '적합' and confidence >= 70:
             approved = True
             rejection_reason = None
-        elif decision == '부적합' and confidence >= 70:
-            approved = False
-            rejection_reason = 'gpt_decision'
         else:
-            # 신뢰도 미달 또는 '불명확' 응답
-            approved = None
-            rejection_reason = 'low_confidence' if confidence < 70 else 'gpt_uncertain'
+            # 부적합, 신뢰도 미달, 불명확 응답 모두 부적합으로 처리
+            approved = False
+            if confidence < 70:
+                rejection_reason = 'low_confidence'
+            elif decision == '부적합':
+                rejection_reason = 'gpt_decision'
+            else:
+                rejection_reason = 'gpt_uncertain'
 
         return {
             'approved': approved,
@@ -539,9 +534,9 @@ def review_announcement_with_chatgpt(
     except Exception as e:
         print(f"      ❌ ChatGPT 검수 중 오류: {str(e)}")
         return {
-            'approved': None,
+            'approved': False,
             'result': json.dumps({
-                'decision': '불명확',
+                'decision': '부적합',
                 'confidence': 0,
                 'reason': f'API 오류: {str(e)}',
                 'key_evidence': '',

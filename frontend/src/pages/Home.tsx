@@ -21,7 +21,6 @@ import {
   Article as ArticleIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  HourglassEmpty as HourglassIcon,
 } from '@mui/icons-material';
 import {
   PieChart,
@@ -42,10 +41,9 @@ import useDashboard from '../hooks/useDashboard';
 import { AnnouncementStatus } from '../types';
 
 /** 상태별 Chip 색상 */
-const statusConfig: Record<AnnouncementStatus, { label: string; color: 'success' | 'error' | 'warning' }> = {
+const statusConfig: Record<AnnouncementStatus, { label: string; color: 'success' | 'error' }> = {
   approved: { label: '적합', color: 'success' },
   rejected: { label: '부적합', color: 'error' },
-  pending: { label: '미검수', color: 'warning' },
 };
 
 /** 통계 카드 설정 */
@@ -53,14 +51,13 @@ const statCards = [
   { key: 'total' as const, label: '총 공고', color: '#1976d2', icon: <ArticleIcon /> },
   { key: 'approved' as const, label: '적합', color: '#2e7d32', icon: <CheckCircleIcon /> },
   { key: 'rejected' as const, label: '부적합', color: '#d32f2f', icon: <CancelIcon /> },
-  { key: 'pending' as const, label: '미검수', color: '#ed6c02', icon: <HourglassIcon /> },
 ];
 
 
 const Home: React.FC = () => {
   const { stats, recentAnnouncements, agencyTopFive, dailyTrend, loading, error } = useDashboard();
   const navigate = useNavigate();
-  const [recentFilter, setRecentFilter] = useState<'approved' | 'rejected' | 'pending'>('approved');
+  const [recentFilter, setRecentFilter] = useState<'approved' | 'rejected'>('approved');
 
   if (loading) {
     return (
@@ -78,7 +75,6 @@ const Home: React.FC = () => {
   const pieData = [
     { name: '적합', value: stats.approved, color: '#2e7d32' },
     { name: '부적합', value: stats.rejected, color: '#d32f2f' },
-    { name: '미검수', value: stats.pending, color: '#ed6c02' },
   ].filter((d) => d.value > 0);
 
   return (
@@ -93,7 +89,7 @@ const Home: React.FC = () => {
           <Grid item xs={6} sm={3} key={card.key}>
             <Card
               sx={{ borderLeft: `4px solid ${card.color}`, height: '100%', cursor: card.key !== 'total' ? 'pointer' : 'default', '&:hover': card.key !== 'total' ? { boxShadow: 4 } : {} }}
-              onClick={() => { if (card.key !== 'total') setRecentFilter(card.key as 'approved' | 'rejected' | 'pending'); }}
+              onClick={() => { if (card.key !== 'total') setRecentFilter(card.key as 'approved' | 'rejected'); }}
             >
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{ color: card.color }}>{card.icon}</Box>
@@ -160,7 +156,7 @@ const Home: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 'bold' }}>최근 공고</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  {(['approved', 'rejected', 'pending'] as const).map((f) => {
+                  {(['approved', 'rejected'] as const).map((f) => {
                     const cfg = statusConfig[f];
                     return (
                       <Button

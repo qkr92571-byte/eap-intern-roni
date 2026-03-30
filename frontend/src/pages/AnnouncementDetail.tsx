@@ -141,48 +141,11 @@ const AnnouncementDetail: React.FC = () => {
             {announcement.title || '제목 없음'}
           </Typography>
           <Box display="flex" gap={2} alignItems="center">
-            {(() => {
-              // 검수 결과에 따른 뱃지 표시
-              let reviewChip = null;
-              if (announcement.reviewed) {
-                if (announcement.status === 'approved') {
-                  reviewChip = (
-                    <Chip
-                      label="적합"
-                      color="success"
-                      size="medium"
-                    />
-                  );
-                } else if (announcement.status === 'rejected') {
-                  reviewChip = (
-                    <Chip
-                      label="부적합"
-                      color="error"
-                      size="medium"
-                    />
-                  );
-                } else {
-                  reviewChip = (
-                    <Chip
-                      label="미검수"
-                      color="default"
-                      size="medium"
-                      variant="outlined"
-                    />
-                  );
-                }
-              } else {
-                reviewChip = (
-                  <Chip
-                    label="미검수"
-                    color="default"
-                    size="medium"
-                    variant="outlined"
-                  />
-                );
-              }
-              return reviewChip;
-            })()}
+            <Chip
+              label={announcement.status === 'approved' ? '적합' : '부적합'}
+              color={announcement.status === 'approved' ? 'success' : 'error'}
+              size="medium"
+            />
             {(() => {
               const naraUrl = getNaraJangteoUrl(announcement.announcement_number);
               return naraUrl ? (

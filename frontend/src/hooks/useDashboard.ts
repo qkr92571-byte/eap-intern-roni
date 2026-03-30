@@ -26,7 +26,7 @@ interface DashboardData {
  * getAnnouncements로 한 번만 쿼리하여 통계, 최근 공고, 기관별 Top5를 계산
  */
 const useDashboard = (): DashboardData => {
-  const [stats, setStats] = useState<Stats>({ total: 0, approved: 0, rejected: 0, pending: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, approved: 0, rejected: 0 });
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
   const [agencyTopFive, setAgencyTopFive] = useState<AgencyCount[]>([]);
   const [dailyTrend, setDailyTrend] = useState<DailyCount[]>([]);
@@ -52,8 +52,7 @@ const useDashboard = (): DashboardData => {
         const total = announcements.length;
         const approved = announcements.filter((a) => a.status === 'approved').length;
         const rejected = announcements.filter((a) => a.status === 'rejected').length;
-        const pending = announcements.filter((a) => a.status === 'pending').length;
-        setStats({ total, approved, rejected, pending });
+        setStats({ total, approved, rejected });
 
         // 전체 공고 전달 (Home에서 필터링 후 5건 표시)
         setRecentAnnouncements(announcements);

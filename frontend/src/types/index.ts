@@ -41,7 +41,7 @@ export interface ServiceItem {
   설명: string;  // 서비스 항목 설명
 }
 
-export type AnnouncementStatus = 'pending' | 'approved' | 'rejected';
+export type AnnouncementStatus = 'approved' | 'rejected';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -54,7 +54,6 @@ export interface ApiResponse<T> {
 export interface Stats {
   total: number;
   approved: number;
-  pending: number;
   rejected: number;
 }
 
