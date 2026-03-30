@@ -86,7 +86,7 @@ const Home: React.FC = () => {
       {/* Row 1: 통계 카드 4개 */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {statCards.map((card) => (
-          <Grid item xs={6} sm={3} key={card.key}>
+          <Grid item xs={12} sm={4} key={card.key}>
             <Card
               sx={{ borderLeft: `4px solid ${card.color}`, height: '100%', cursor: card.key !== 'total' ? 'pointer' : 'default', '&:hover': card.key !== 'total' ? { boxShadow: 4 } : {} }}
               onClick={() => { if (card.key !== 'total') setRecentFilter(card.key as 'approved' | 'rejected'); }}
