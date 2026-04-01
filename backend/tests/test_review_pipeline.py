@@ -19,6 +19,13 @@ def sample_announcements():
         return json.load(f)
 
 
+_TEST_PROMPT = (
+    "공고명: {title}\n발주기관: {agency}\n업무구분: {business_type}\n"
+    "게시일: {publish_date}\n예산: {budget_info}\n공고번호: {announcement_number}\n"
+    "첨부파일:\n{attachment_text}"
+)
+
+
 @pytest.fixture
 def mock_gpt_적합(mocker):
     """GPT → 항상 '적합' 응답 반환"""
@@ -33,6 +40,7 @@ def mock_gpt_적합(mocker):
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = mock_response
     mocker.patch('services.review_service.get_openai_client', return_value=mock_client)
+    mocker.patch('services.review_service.load_eap_review_prompt', return_value=_TEST_PROMPT)
 
 
 class TestReviewPipeline:

@@ -22,6 +22,14 @@ from utils.constants import (
     OPENAI_MAX_TOKENS_REVIEW,
     OPENAI_TEMPERATURE_REVIEW
 )
+# review_filter 모듈로 이전됨 — 하위 호환성을 위해 re-export
+from services.review_filter import (
+    EXCLUSION_KEYWORDS,
+    FAST_APPROVE_PATTERNS,
+    should_exclude_by_keywords,
+    classify_by_title,
+)
+from utils.formatters import format_currency
 
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -54,151 +62,9 @@ def load_eap_review_prompt() -> str:
 다음 공고가 EAP에 적합한지 검토해주세요.
 """
 
-# 제외 키워드 목록 (제목에 포함되면 자동으로 부적합 처리)
-EXCLUSION_KEYWORDS = [
-    # ── 기존 유지 ────────────────────────────────────────
-    '콜센터',
-    '차량 임차',
-    '차량임차',
-    '운행',
-    '통근버스',
-    '통근 버스',
-    '버스 운행',
-    '버스운행',
-    '근로자 파견',
-    # '파견 용역', '파견용역'은 제외하지 않음 (필요한 공고가 있을 수 있음)
-
-    # ── 취업/진로/직업 상담 (비심리적) ───────────────────
-    '취업상담',
-    '취업 상담',
-    '직업상담',
-    '직업 상담',
-    '진로상담',
-    '진로 상담',
-    '진학상담',
-    '진학 상담',
-    '취업성공',           # 취업성공디딤돌 등 취업지원 사업
-
-    # ── 세무/법률/금융 상담 (비심리적) ───────────────────
-    '세무상담',
-    '세무 상담',
-    '법률상담',
-    '법률 상담',
-    '소득세',             # 종합소득세 홈택스 임시상담 등
-
-    # ── 농업/수출/가맹 상담 (비심리적) ───────────────────
-    '수출상담',
-    '수출 상담',
-    '바이어 상담',
-    '가맹상담',
-    '창업상담',
-    '주거상담',
-    '주거 상담',
-
-    # ── IT 상담시스템 유지보수 ────────────────────────────
-    '상담시스템 유지보수',
-    '상담 시스템 유지보수',
-
-    # ── 상담사 자격시험 ───────────────────────────────────
-    '자격시험',
-    '상담사 자격',
-
-    # ── 고객서비스 품질관리 ───────────────────────────────
-    '전화상담 품질',
-    '고객만족도 조사',
-
-    # ── 관광/통역 ─────────────────────────────────────────
-    '관광통역',
-]
-
-# 제목만으로 명확히 적합 판단할 수 있는 키워드 패턴
-# keyword: 이 문자열이 제목에 포함되면 적합 가능성 높음
-# exceptions: keyword와 함께 있을 때 fast_approve 불가 (시스템 개발 등 제외)
-FAST_APPROVE_PATTERNS = [
-    # ── 기존 유지 ────────────────────────────────────────────────
-    {'keyword': '찾아가는 상담실', 'exceptions': ['개발', '구축', '시스템']},
-    {'keyword': '근로자지원프로그램(EAP)', 'exceptions': ['개발', '구축']},
-    {'keyword': 'EAP 운영', 'exceptions': ['개발', '구축']},
-
-    # ── EAP 직접 표기 변형 ────────────────────────────────────────
-    {'keyword': 'EAP운영', 'exceptions': ['개발', '구축']},
-    {'keyword': '근로자지원프로그램 운영', 'exceptions': ['개발', '구축']},
-
-    # ── 심리상담 서비스 직접 표기 ─────────────────────────────────
-    # 실제 적합: "대중문화예술인 심리상담 위탁용역", "청년 마음이음 전문심리상담"
-    {'keyword': '심리상담 위탁', 'exceptions': ['개발', '구축', '시스템']},
-    {'keyword': '심리상담 용역', 'exceptions': ['개발', '구축', '시스템']},
-    {'keyword': '심리상담 운영', 'exceptions': ['개발', '구축', '시스템']},
-    {'keyword': '전문심리상담', 'exceptions': ['개발', '구축', '시스템']},
-
-    # ── 학생/청소년 정서 관련 ─────────────────────────────────────
-    # 실제 적합: "학생정서행동특성검사 상담기관 위탁운영" (세종교육청)
-    {'keyword': '정서행동특성검사', 'exceptions': ['개발', '구축', '시스템']},
-
-    # ── 특수 심리지원 ─────────────────────────────────────────────
-    # 실제 적합: "펫로스 심리지원 시범사업"
-    {'keyword': '심리지원 시범', 'exceptions': ['개발', '구축']},
-    # 실제 적합: "청년 마음이음 사업"
-    {'keyword': '마음이음', 'exceptions': ['개발', '구축']},
-
-    # ── 인력 파견형 EAP ───────────────────────────────────────────
-    {'keyword': '전문상담사 파견', 'exceptions': ['개발', '구축']},
-    {'keyword': '심리상담사 파견', 'exceptions': ['개발', '구축']},
-
-    # ── 소방/공무원 심리지원 ──────────────────────────────────────
-    # 실제 적합: "전국 소방공무원 마음건강 설문조사 통계 및 분석"
-    {'keyword': '소방공무원 마음', 'exceptions': ['개발', '구축']},
-    {'keyword': '마음건강 설문', 'exceptions': ['개발', '구축', '시스템']},
-]
-
 # 검수용 첨부파일 텍스트 제한
 ATTACHMENT_MAX_CHARS_PER_FILE = 2000   # 파일 1개당 최대 문자 수
 ATTACHMENT_MAX_TOTAL_CHARS = 4000      # GPT에 전달할 전체 최대 문자 수
-
-def should_exclude_by_keywords(announcement: Dict) -> tuple[bool, str]:
-    """
-    제외 키워드로 인한 자동 부적합 판단
-    
-    Args:
-        announcement: 공고 데이터 딕셔너리
-        
-    Returns:
-        (제외 여부, 제외 사유) 튜플
-    """
-    title = announcement.get('title', '').lower()
-    
-    for keyword in EXCLUSION_KEYWORDS:
-        if keyword.lower() in title:
-            return True, f"제외 키워드 포함: '{keyword}'"
-    
-    return False, ""
-
-
-def classify_by_title(announcement: Dict) -> str:
-    """
-    제목 기반 빠른 분류 (1단계 필터)
-
-    Returns:
-        'rejected'  - 제외 키워드 hit → 첨부파일 불필요
-        'approved'  - 명확 EAP 키워드 hit → 첨부파일 불필요
-        'uncertain' - 판단 불가 → 2단계(첨부파일 기반 GPT) 필요
-    """
-    # 제외 키워드 체크
-    exclude, _ = should_exclude_by_keywords(announcement)
-    if exclude:
-        return 'rejected'
-
-    title = announcement.get('title', '')
-
-    # 명확 적합 키워드 체크
-    for pattern in FAST_APPROVE_PATTERNS:
-        if pattern['keyword'] in title:
-            has_exception = any(exc in title for exc in pattern['exceptions'])
-            if not has_exception:
-                return 'approved'
-
-    return 'uncertain'
-
 
 def fetch_attachment_text_for_review(
     announcement_number: str,
@@ -252,6 +118,95 @@ def fetch_attachment_text_for_review(
     except Exception as e:
         print(f"      ❌ 첨부파일 텍스트 추출 중 오류: {e}")
         return '', 'attachment_failed'
+
+
+def _make_review_result(decision: str, confidence: int, reason: str, key_evidence: str = '') -> str:
+    """review_result JSON 문자열 생성 헬퍼"""
+    return json.dumps({
+        'decision': decision,
+        'confidence': confidence,
+        'reason': reason,
+        'key_evidence': key_evidence,
+    }, ensure_ascii=False)
+
+
+def _process_single_announcement(
+    announcement: Dict,
+    idx: int,
+    total: int,
+    cached_prompt: str,
+) -> str:
+    """
+    공고 1개 검수 처리 (review_report_file 루프 body 추출).
+
+    Returns:
+        STATUS_APPROVED | STATUS_REJECTED
+    """
+    announcement_number = announcement.get('announcement_number', '')
+    title = announcement.get('title', '')
+
+    # 이미 검수된 공고 건너뛰기
+    if announcement.get('reviewed') and announcement.get('review_result') and announcement.get('status'):
+        print(f"   [{idx}/{total}] 이미 검수됨: {announcement_number}")
+        return announcement.get('status', STATUS_REJECTED)
+
+    # ── 1단계: 제목 기반 빠른 분류 ──────────────────────────────
+    title_class = classify_by_title(announcement)
+
+    if title_class == 'rejected':
+        _, exclude_reason = should_exclude_by_keywords(announcement)
+        print(f"   [{idx}/{total}] 🚫 [키워드필터] {title[:30]}... ({exclude_reason})")
+        announcement.update({
+            'reviewed': True,
+            'review_method': 'keyword_filter',
+            'rejection_reason': 'keyword_filter',
+            'review_result': _make_review_result('부적합', 100, exclude_reason, exclude_reason),
+            'review_model': 'keyword-filter',
+            'reviewed_at': datetime.now().isoformat(),
+            'status': STATUS_REJECTED,
+        })
+        return STATUS_REJECTED
+
+    if title_class == 'approved':
+        matched_keyword = next(
+            (p['keyword'] for p in FAST_APPROVE_PATTERNS if p['keyword'] in title),
+            title[:20]
+        )
+        print(f"   [{idx}/{total}] ✅ [제목확정] {title[:30]}...")
+        announcement.update({
+            'reviewed': True,
+            'review_method': 'title_approved',
+            'review_result': _make_review_result(
+                '적합', 95, f'제목에 명확한 EAP 키워드 포함: {matched_keyword}', matched_keyword
+            ),
+            'review_model': 'title-filter',
+            'reviewed_at': datetime.now().isoformat(),
+            'status': STATUS_APPROVED,
+        })
+        return STATUS_APPROVED
+
+    # ── 2단계: GPT 심층 검수 ─────────────────────────────────────
+    print(f"   [{idx}/{total}] 🔍 [GPT검수] {title[:30]}...")
+    # 첨부파일 다운로드 비활성화 (CI 환경에서 타임아웃 발생으로 제외)
+    review_result = review_announcement_with_chatgpt(announcement, '', base_prompt=cached_prompt)
+
+    announcement.update({
+        'reviewed': True,
+        'review_result': review_result.get('result', ''),
+        'review_model': review_result.get('model', OPENAI_MODEL_REVIEW),
+        'reviewed_at': datetime.now().isoformat(),
+        'review_method': 'attachment_skipped',
+    })
+
+    if review_result.get('approved') is True:
+        announcement['status'] = STATUS_APPROVED
+        print(f"      ✅ 📄 {announcement_number[:25]}...")
+        return STATUS_APPROVED
+    else:
+        announcement['status'] = STATUS_REJECTED
+        announcement['rejection_reason'] = review_result.get('rejection_reason', 'gpt_decision')
+        print(f"      ❌ 📄 {announcement_number[:25]}...")
+        return STATUS_REJECTED
 
 
 def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
@@ -320,129 +275,38 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 }
             print()
         
+        # EAP 검수 프롬프트 1회 로드 (루프 안에서 반복 Firestore 조회 방지)
+        print("\n1.5. EAP 검수 프롬프트 로드 중...")
+        cached_prompt = load_eap_review_prompt()
+        print(f"   ✅ 프롬프트 로드 완료 ({len(cached_prompt)}자)")
+
         # 각 공고 검수 (2단계 파이프라인)
         print("\n2. 공고 검수 중 (1단계: 키워드 필터 → 2단계: 첨부파일 기반 GPT 검수)...")
         reviewed_count = 0
         approved_count = 0
         rejected_count = 0
-        pending_count = 0
         error_count = 0
 
         for idx, announcement in enumerate(report_data, 1):
             try:
-                announcement_number = announcement.get('announcement_number', '')
-                title = announcement.get('title', '')
-
-                # 이미 검수된 공고는 건너뛰기
-                if announcement.get('reviewed', False) and announcement.get('review_result') and announcement.get('status'):
-                    print(f"   [{idx}/{len(report_data)}] 이미 검수됨: {announcement_number}")
-                    reviewed_count += 1
-                    status = announcement.get('status')
-                    if status == STATUS_APPROVED:
-                        approved_count += 1
-                    elif status == STATUS_REJECTED:
-                        rejected_count += 1
-                    else:
-                        pending_count += 1
-                    continue
-
-                # ── 1단계: 제목 기반 빠른 분류 ──────────────────────────────
-                title_class = classify_by_title(announcement)
-
-                if title_class == 'rejected':
-                    _, exclude_reason = should_exclude_by_keywords(announcement)
-                    print(f"   [{idx}/{len(report_data)}] 🚫 [키워드필터] {title[:30]}... ({exclude_reason})")
-                    announcement.update({
-                        'reviewed': True,
-                        'review_method': 'keyword_filter',
-                        'rejection_reason': 'keyword_filter',
-                        'review_result': json.dumps({
-                            'decision': '부적합',
-                            'confidence': 100,
-                            'reason': exclude_reason,
-                            'key_evidence': exclude_reason,
-                        }, ensure_ascii=False),
-                        'review_model': 'keyword-filter',
-                        'reviewed_at': datetime.now().isoformat(),
-                        'status': STATUS_REJECTED,
-                    })
-                    rejected_count += 1
-                    reviewed_count += 1
-                    continue
-
-                elif title_class == 'approved':
-                    matched_keyword = next(
-                        (p['keyword'] for p in FAST_APPROVE_PATTERNS if p['keyword'] in title),
-                        title[:20]
-                    )
-                    print(f"   [{idx}/{len(report_data)}] ✅ [제목확정] {title[:30]}...")
-                    announcement.update({
-                        'reviewed': True,
-                        'review_method': 'title_approved',
-                        'review_result': json.dumps({
-                            'decision': '적합',
-                            'confidence': 95,
-                            'reason': f'제목에 명확한 EAP 키워드 포함: {matched_keyword}',
-                            'key_evidence': matched_keyword,
-                        }, ensure_ascii=False),
-                        'review_model': 'title-filter',
-                        'reviewed_at': datetime.now().isoformat(),
-                        'status': STATUS_APPROVED,
-                    })
-                    approved_count += 1
-                    reviewed_count += 1
-                    continue
-
-                # ── 2단계: GPT 심층 검수 (첨부파일 다운로드 생략) ─────────────────────
-                print(f"   [{idx}/{len(report_data)}] 🔍 [GPT검수] {title[:30]}...")
-
-                # 첨부파일 다운로드 비활성화 (CI 환경에서 타임아웃 발생으로 제외)
-                attachment_text, attach_method = '', 'attachment_skipped'
-
-                review_result = review_announcement_with_chatgpt(announcement, attachment_text)
-
-                # 결과 반영
-                review_method = attach_method if not review_result.get('error') else 'attachment_failed'
-                announcement.update({
-                    'reviewed': True,
-                    'review_result': review_result.get('result', ''),
-                    'review_model': review_result.get('model', OPENAI_MODEL_REVIEW),
-                    'reviewed_at': datetime.now().isoformat(),
-                    'review_method': review_method,
-                })
-
-                if review_result.get('approved') is True:
-                    announcement['status'] = STATUS_APPROVED
-                    status_icon = '✅'
+                status = _process_single_announcement(announcement, idx, len(report_data), cached_prompt)
+                reviewed_count += 1
+                if status == STATUS_APPROVED:
                     approved_count += 1
                 else:
-                    announcement['status'] = STATUS_REJECTED
-                    announcement['rejection_reason'] = review_result.get('rejection_reason', 'gpt_decision')
-                    status_icon = '❌'
                     rejected_count += 1
-
-                reviewed_count += 1
-                attach_icon = '📎' if attach_method == 'with_attachment' else '📄'
-                print(f"      {status_icon} {attach_icon} {announcement_number[:25]}...")
-
             except Exception as e:
                 print(f"   [{idx}/{len(report_data)}] ❌ 검수 실패: {str(e)}")
                 error_count += 1
                 announcement.update({
                     'reviewed': True,
-                    'review_result': json.dumps({
-                        'decision': '불명확',
-                        'confidence': 0,
-                        'reason': f'검수 중 오류 발생: {str(e)}',
-                        'key_evidence': '',
-                    }, ensure_ascii=False),
+                    'review_result': _make_review_result('불명확', 0, f'검수 중 오류 발생: {str(e)}'),
                     'review_method': 'error',
                     'rejection_reason': 'api_error',
                     'status': STATUS_REJECTED,
                 })
                 rejected_count += 1
                 reviewed_count += 1
-                continue
         
         # 검수된 리포트 파일 저장
         print("\n3. 검수된 리포트 파일 저장 중...")
@@ -471,7 +335,6 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
             'reviewed_count': reviewed_count,
             'approved_count': approved_count,
             'rejected_count': rejected_count,
-            'pending_count': pending_count,
             'error_count': error_count,
             'report_path': str(filepath)
         }
@@ -492,6 +355,7 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
 def review_announcement_with_chatgpt(
     announcement: Dict,
     attachment_text: str = '',
+    base_prompt: str = '',
 ) -> Dict:
     """
     ChatGPT API를 사용하여 개별 공고 검수 (JSON 응답 구조화)
@@ -530,8 +394,9 @@ def review_announcement_with_chatgpt(
             else:
                 budget_info = f"추정가격: {format_currency(estimated_price)}원"
 
-        # EAP 검수 프롬프트 로드 후 공고 정보 삽입
-        base_prompt = load_eap_review_prompt()
+        # EAP 검수 프롬프트 로드 (외부에서 전달된 경우 재사용, 없으면 Firestore에서 로드)
+        if not base_prompt:
+            base_prompt = load_eap_review_prompt()
         prompt = base_prompt.format(
             title=title,
             agency=agency,
@@ -621,45 +486,4 @@ def review_announcement_with_chatgpt(
             'error': str(e),
         }
 
-def format_currency(amount: int) -> str:
-    """
-    금액을 읽기 쉬운 형식으로 포맷팅
-    
-    Args:
-        amount: 금액 (원 단위)
-    
-    Returns:
-        포맷팅된 문자열 (예: "1억 5천만원")
-    """
-    if amount is None:
-        return "0원"
-    
-    if amount < 10000:
-        return f"{amount:,}원"
-    
-    result = []
-    
-    # 억 단위
-    eok = amount // 100000000
-    if eok > 0:
-        result.append(f"{eok}억")
-        amount = amount % 100000000
-    
-    # 천만 단위
-    cheonman = amount // 10000000
-    if cheonman > 0:
-        result.append(f"{cheonman}천만")
-        amount = amount % 10000000
-    
-    # 만 단위
-    man = amount // 10000
-    if man > 0:
-        result.append(f"{man}만")
-        amount = amount % 10000
-    
-    # 원 단위
-    if amount > 0:
-        result.append(f"{amount:,}")
-    
-    return " ".join(result) + "원"
 

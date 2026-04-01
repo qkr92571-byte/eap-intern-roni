@@ -19,8 +19,15 @@ SAMPLE_ANNOUNCEMENT = {
 }
 
 
+_TEST_PROMPT = (
+    "공고명: {title}\n발주기관: {agency}\n업무구분: {business_type}\n"
+    "게시일: {publish_date}\n예산: {budget_info}\n공고번호: {announcement_number}\n"
+    "첨부파일:\n{attachment_text}"
+)
+
+
 def _make_mock_openai(mocker, decision: str, confidence: int, reason: str = "테스트", key_evidence: str = ""):
-    """OpenAI 클라이언트를 mock으로 대체하는 헬퍼"""
+    """OpenAI 클라이언트와 프롬프트 로더를 mock으로 대체하는 헬퍼"""
     content = json.dumps({
         "decision": decision,
         "confidence": confidence,
@@ -32,6 +39,8 @@ def _make_mock_openai(mocker, decision: str, confidence: int, reason: str = "테
     mock_client = mocker.MagicMock()
     mock_client.chat.completions.create.return_value = mock_response
     mocker.patch('services.review_service.get_openai_client', return_value=mock_client)
+    # 프롬프트 파일의 raw '{' 문자가 str.format() 오류를 일으키지 않도록 mock 처리
+    mocker.patch('services.review_service.load_eap_review_prompt', return_value=_TEST_PROMPT)
     return mock_client
 
 
@@ -72,6 +81,7 @@ class TestGptReviewEdgeCases:
         mock_client = mocker.MagicMock()
         mock_client.chat.completions.create.return_value = mock_response
         mocker.patch('services.review_service.get_openai_client', return_value=mock_client)
+        mocker.patch('services.review_service.load_eap_review_prompt', return_value=_TEST_PROMPT)
 
         result = review_announcement_with_chatgpt(SAMPLE_ANNOUNCEMENT)
         assert result['approved'] is False

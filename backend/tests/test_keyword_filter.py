@@ -4,7 +4,7 @@ EXCLUSION_KEYWORDS / FAST_APPROVE_PATTERNS 단위 테스트
 - 실제 데이터 기반 케이스
 """
 import pytest
-from services.review_service import (
+from services.review_filter import (
     EXCLUSION_KEYWORDS,
     FAST_APPROVE_PATTERNS,
     should_exclude_by_keywords,
