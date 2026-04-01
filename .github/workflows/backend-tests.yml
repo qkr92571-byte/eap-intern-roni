@@ -1,0 +1,32 @@
+name: Backend Tests
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 의존성 설치
+        run: pip install -r backend/requirements.txt
+
+      - name: 단위 테스트 실행
+        working-directory: backend
+        run: python -m pytest tests/ -v --tb=short
+        env:
+          # Firebase, OpenAI는 mock으로 대체되므로 실제 키 불필요
+          SKIP_FIRESTORE_PROMPT: "true"
