@@ -30,6 +30,9 @@ from services.review_filter import (
     classify_by_title,
 )
 from utils.formatters import format_currency
+from utils.logger import StepLogger
+
+_logger = StepLogger("ReviewService")
 
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -223,17 +226,15 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
     if report_date is None:
         report_date = datetime.now()
     
-    print("=" * 60)
-    print("리포트 파일 검수 시작")
-    print("=" * 60)
-    print(f"날짜: {report_date.strftime('%Y-%m-%d')}")
+    _logger.start()
+    _logger.info(f"날짜: {report_date.strftime('%Y-%m-%d')}")
     
     # OpenAI API 키 확인
     try:
         get_openai_client()
     except ValueError as e:
-        error_msg = f"⚠️  {str(e)}"
-        print(error_msg)
+        error_msg = str(e)
+        _logger.warning(error_msg)
         return {
             'success': False,
             'error': error_msg,
@@ -244,11 +245,11 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
     
     try:
         # 리포트 파일 로드
-        print("\n1. 리포트 파일 로드 중...")
+        _logger.section("1. 리포트 파일 로드 중...")
         report_data = load_report(report_date)
-        
+
         if not report_data:
-            print("   ⚠️  검수할 데이터가 없습니다.")
+            _logger.warning("검수할 데이터가 없습니다.")
             return {
                 'success': False,
                 'error': '검수할 데이터가 없습니다.',
@@ -256,16 +257,16 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 'approved_count': 0,
                 'rejected_count': 0
             }
-        
-        print(f"   ✅ 리포트 파일 로드 완료: {len(report_data)}개 공고")
+
+        _logger.success(f"리포트 파일 로드 완료: {len(report_data)}개 공고")
         
         # 사용자 컨펌 확인
         if confirm_before_review:
-            print("\n⚠️  ChatGPT API 사용 시 비용이 발생합니다.")
-            print(f"   검수할 공고 수: {len(report_data)}개")
-            print(f"   예상 비용: 약 ${len(report_data) * 0.002:.2f} (gpt-3.5-turbo 기준)")
+            _logger.warning("ChatGPT API 사용 시 비용이 발생합니다.")
+            _logger.info(f"검수할 공고 수: {len(report_data)}개")
+            _logger.info(f"예상 비용: 약 ${len(report_data) * 0.002:.2f} (gpt-3.5-turbo 기준)")
             if not request_confirmation("검수를 진행하시겠습니까? (yes/no): "):
-                print("   검수가 취소되었습니다.")
+                _logger.warning("검수가 취소되었습니다.")
                 return {
                     'success': False,
                     'error': '사용자가 검수를 취소했습니다.',
@@ -273,15 +274,14 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                     'approved_count': 0,
                     'rejected_count': 0
                 }
-            print()
         
         # EAP 검수 프롬프트 1회 로드 (루프 안에서 반복 Firestore 조회 방지)
-        print("\n1.5. EAP 검수 프롬프트 로드 중...")
+        _logger.section("1.5. EAP 검수 프롬프트 로드 중...")
         cached_prompt = load_eap_review_prompt()
-        print(f"   ✅ 프롬프트 로드 완료 ({len(cached_prompt)}자)")
+        _logger.success(f"프롬프트 로드 완료 ({len(cached_prompt)}자)")
 
         # 각 공고 검수 (2단계 파이프라인)
-        print("\n2. 공고 검수 중 (1단계: 키워드 필터 → 2단계: 첨부파일 기반 GPT 검수)...")
+        _logger.section("2. 공고 검수 중 (1단계: 키워드 필터 → 2단계: GPT 검수)...")
         reviewed_count = 0
         approved_count = 0
         rejected_count = 0
@@ -296,7 +296,7 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 else:
                     rejected_count += 1
             except Exception as e:
-                print(f"   [{idx}/{len(report_data)}] ❌ 검수 실패: {str(e)}")
+                _logger.error(f"[{idx}/{len(report_data)}] 검수 실패: {str(e)}")
                 error_count += 1
                 announcement.update({
                     'reviewed': True,
@@ -309,7 +309,7 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
                 reviewed_count += 1
         
         # 검수된 리포트 파일 저장
-        print("\n3. 검수된 리포트 파일 저장 중...")
+        _logger.section("3. 검수된 리포트 파일 저장 중...")
         date_str = get_date_string(report_date)
         filename = f'report_{date_str}.json'
         filepath = REPORT_DIR / filename
@@ -317,18 +317,16 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(report_data, f, ensure_ascii=False, indent=2)
         
-        print(f"   ✅ 리포트 파일 저장 완료: {filepath}")
-        
+        _logger.success(f"리포트 파일 저장 완료: {filepath}")
+
         # 결과 출력
-        print("\n" + "=" * 60)
-        print("검수 완료!")
-        print("=" * 60)
-        print(f"전체 공고: {len(report_data)}개")
-        print(f"검수 완료: {reviewed_count}개")
-        print(f"  ✅ 적합: {approved_count}개")
-        print(f"  ❌ 부적합: {rejected_count}개")
+        _logger.start()
+        _logger.info(f"전체 공고: {len(report_data)}개")
+        _logger.info(f"검수 완료: {reviewed_count}개")
+        _logger.success(f"적합: {approved_count}개")
+        _logger.error(f"부적합: {rejected_count}개")
         if error_count > 0:
-            print(f"  ⚠️  오류: {error_count}개")
+            _logger.warning(f"오류: {error_count}개")
 
         return {
             'success': True,
@@ -340,10 +338,10 @@ def review_report_file(report_date=None, confirm_before_review=True) -> Dict:
         }
         
     except Exception as e:
-        error_msg = f"검수 중 오류 발생: {str(e)}"
-        print(f"\n❌ {error_msg}")
         import traceback
-        print(traceback.format_exc())
+        error_msg = f"검수 중 오류 발생: {str(e)}"
+        _logger.error(error_msg)
+        _logger.error(traceback.format_exc())
         return {
             'success': False,
             'error': error_msg,
@@ -434,7 +432,7 @@ def review_announcement_with_chatgpt(
         try:
             parsed = json.loads(result_text)
         except json.JSONDecodeError:
-            print(f"      ⚠️  GPT JSON 파싱 실패: {result_text[:100]}")
+            _logger.warning(f"GPT JSON 파싱 실패: {result_text[:100]}")
             return {
                 'approved': False,
                 'result': result_text,
@@ -471,7 +469,7 @@ def review_announcement_with_chatgpt(
         }
 
     except Exception as e:
-        print(f"      ❌ ChatGPT 검수 중 오류: {str(e)}")
+        _logger.error(f"ChatGPT 검수 중 오류: {str(e)}")
         return {
             'approved': False,
             'result': json.dumps({
