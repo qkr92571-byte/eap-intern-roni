@@ -1,0 +1,38 @@
+[
+  {
+    "announcement_number": "R26BK00000001-000",
+    "title": "소방공무원 찾아가는 상담실 운영 용역",
+    "agency": "소방청",
+    "business_type": "용역비",
+    "publish_date": "2026-03-31",
+    "budget_amount": 150000000,
+    "source": "나라장터"
+  },
+  {
+    "announcement_number": "R26BK00000002-000",
+    "title": "2026년 취업상담 클리닉 운영 용역",
+    "agency": "고용노동부",
+    "business_type": "용역비",
+    "publish_date": "2026-03-31",
+    "budget_amount": 80000000,
+    "source": "나라장터"
+  },
+  {
+    "announcement_number": "R26BK00000003-000",
+    "title": "청년 마음이음 전문심리상담 용역",
+    "agency": "서울특별시",
+    "business_type": "용역비",
+    "publish_date": "2026-03-31",
+    "budget_amount": 120000000,
+    "source": "나라장터"
+  },
+  {
+    "announcement_number": "R26BK00000004-000",
+    "title": "직원 복리후생 프로그램 운영",
+    "agency": "한국수력원자력",
+    "business_type": "용역비",
+    "publish_date": "2026-03-31",
+    "budget_amount": 50000000,
+    "source": "나라장터"
+  }
+]
