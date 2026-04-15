@@ -148,8 +148,9 @@ def _process_single_announcement(
     announcement_number = announcement.get('announcement_number', '')
     title = announcement.get('title', '')
 
-    # 이미 검수된 공고 건너뛰기
-    if announcement.get('reviewed') and announcement.get('review_result') and announcement.get('status'):
+    # 이미 검수된 공고 건너뛰기 (단, API 오류로 실패한 경우 재검수)
+    if (announcement.get('reviewed') and announcement.get('review_result') and announcement.get('status')
+            and announcement.get('rejection_reason') != 'api_error'):
         print(f"   [{idx}/{total}] 이미 검수됨: {announcement_number}")
         return announcement.get('status', STATUS_REJECTED)
 
