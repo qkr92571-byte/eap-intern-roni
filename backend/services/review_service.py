@@ -205,6 +205,11 @@ def _process_single_announcement(
         announcement['status'] = STATUS_APPROVED
         print(f"      ✅ 📄 {announcement_number[:25]}...")
         return STATUS_APPROVED
+    elif review_result.get('approved') is None:
+        announcement['status'] = STATUS_PENDING
+        announcement['rejection_reason'] = review_result.get('rejection_reason', 'gpt_uncertain')
+        print(f"      ⏳ 📄 {announcement_number[:25]}... (수동 검토 필요)")
+        return STATUS_PENDING
     else:
         announcement['status'] = STATUS_REJECTED
         announcement['rejection_reason'] = review_result.get('rejection_reason', 'gpt_decision')
@@ -414,7 +419,11 @@ def review_announcement_with_chatgpt(
                     "content": (
                         "당신은 근로자지원프로그램(EAP) 전문가입니다. "
                         "공고가 EAP의 핵심 요소(심리 상담, 코칭, 근로자 지원 서비스 등)와 관련이 있는지 판단합니다. "
-                        "반드시 JSON 형식으로만 응답하세요."
+                        "반드시 다음 JSON 형식으로만 응답하세요 (다른 텍스트 절대 금지): "
+                        '{"decision": "적합" 또는 "부적합" 또는 "불명확", '
+                        '"confidence": 0~100 사이 정수, '
+                        '"reason": "판단 근거 2-3문장", '
+                        '"key_evidence": "결정적 원문 구절 (없으면 빈 문자열)"}'
                     )
                 },
                 {
@@ -446,19 +455,20 @@ def review_announcement_with_chatgpt(
         confidence = int(parsed.get('confidence', 0))
         key_evidence = parsed.get('key_evidence', '')
 
-        # 결정 로직: confidence < 70 또는 '불명확' → 부적합 처리
+        # 결정 로직
         if decision == '적합' and confidence >= 70:
             approved = True
             rejection_reason = None
+        elif decision == '불명확':
+            # 불명확 → pending (수동 검토 대기)
+            approved = None
+            rejection_reason = 'gpt_uncertain'
         else:
-            # 부적합, 신뢰도 미달, 불명확 응답 모두 부적합으로 처리
             approved = False
             if confidence < 70:
                 rejection_reason = 'low_confidence'
-            elif decision == '부적합':
-                rejection_reason = 'gpt_decision'
             else:
-                rejection_reason = 'gpt_uncertain'
+                rejection_reason = 'gpt_decision'
 
         return {
             'approved': approved,
