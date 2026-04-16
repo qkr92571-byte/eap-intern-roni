@@ -113,13 +113,50 @@ class Orchestrator:
                     self.logger.warning("수집된 공고가 없습니다.")
                     return results
             else:
-                self.logger.info("[1단계] 수집 건너뛰기 — 기존 리포트 파일로 재검수")
+                self.logger.info("[1단계] 수집 건너뛰기 — Firestore에서 오늘 공고 다운로드 후 재검수")
                 from services.file_service import REPORT_DIR, get_date_string
+                from services.firebase_service import get_db
+                import json
+                from pathlib import Path
+
                 date_str = get_date_string(report_date)
                 report_file_path = str(REPORT_DIR / f'report_{date_str}.json')
-                if not __import__('pathlib').Path(report_file_path).exists():
+
+                # Firestore에서 오늘 날짜 공고 조회
+                try:
+                    from datetime import timezone, timedelta
+                    kst = timezone(timedelta(hours=9))
+                    day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                    day_end = day_start + timedelta(days=1)
+                    day_start_str = day_start.astimezone(timezone.utc).isoformat()
+                    day_end_str = day_end.astimezone(timezone.utc).isoformat()
+
+                    db = get_db()
+                    docs = db.collection('announcements') \
+                        .where('created_at', '>=', day_start_str) \
+                        .where('created_at', '<', day_end_str) \
+                        .stream()
+                    announcements = [doc.to_dict() for doc in docs]
+
+                    if not announcements:
+                        results['success'] = False
+                        results['error'] = f"Firestore에 {date_str} 날짜 공고가 없습니다."
+                        return results
+
+                    # 재검수를 위해 reviewed 플래그 초기화
+                    for ann in announcements:
+                        ann['reviewed'] = False
+
+                    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+                    with open(report_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(announcements, f, ensure_ascii=False, indent=2)
+
+                    self.logger.success(f"Firestore에서 {len(announcements)}개 공고 로드 완료 → {report_file_path}")
+                    report_file_path = report_file_path
+
+                except Exception as e:
                     results['success'] = False
-                    results['error'] = f"리포트 파일 없음: {report_file_path}"
+                    results['error'] = f"Firestore 공고 다운로드 실패: {e}"
                     return results
             
             # 2. 검수
