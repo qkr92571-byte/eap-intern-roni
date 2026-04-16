@@ -63,6 +63,12 @@ def parse_args():
     )
     
     parser.add_argument(
+        '--skip-collect',
+        action='store_true',
+        help='수집 단계 건너뛰기 (기존 리포트 파일로 재검수 시 사용)'
+    )
+
+    parser.add_argument(
         '--skip-review',
         action='store_true',
         help='검수 단계 건너뛰기'
@@ -112,6 +118,7 @@ def main():
     # 워크플로우 실행
     results = orchestrator.execute_daily_report(
         report_date=report_date,
+        skip_collect=args.skip_collect,
         skip_review=args.skip_review,
         skip_service_items=args.skip_service_items,
         skip_slack=args.skip_slack

@@ -21,6 +21,14 @@ on:
         options:
           - 'false'
           - 'true'
+      skip_collect:
+        description: '수집 건너뛰기 — 기존 리포트 파일로 재검수할 때 사용'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   daily-report:
@@ -122,7 +130,10 @@ jobs:
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > backend/config/firebase-credentials.json
 
       - name: 일일 리포트 실행
-        run: python -u -m backend.entrypoints.daily_report --auto
+        run: |
+          ARGS="--auto"
+          [ "${{ github.event.inputs.skip_collect }}" = "true" ] && ARGS="$ARGS --skip-collect"
+          python -u -m backend.entrypoints.daily_report $ARGS
         env:
           PYTHONUNBUFFERED: "1"
           AUTO_CONFIRM: "1"

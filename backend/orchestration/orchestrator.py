@@ -47,6 +47,7 @@ class Orchestrator:
     def execute_daily_report(
         self,
         report_date: Optional[datetime] = None,
+        skip_collect: bool = False,
         skip_review: bool = False,
         skip_service_items: bool = False,
         skip_slack: bool = False
@@ -95,21 +96,31 @@ class Orchestrator:
         
         try:
             # 1. 수집
-            self.logger.section("[1단계] 공고 수집")
-            collect_result = self.collector.collect(request_date=report_date)
-            results['collect_result'] = collect_result
-            
-            if not collect_result.get('success'):
-                results['success'] = False
-                results['error'] = f"수집 실패: {collect_result.get('error')}"
-                return results
-            
-            report_file_path = collect_result.get('report_file_path')
-            collected_count = collect_result.get('collected_count', 0)
-            
-            if collected_count == 0:
-                self.logger.warning("수집된 공고가 없습니다.")
-                return results
+            if not skip_collect:
+                self.logger.section("[1단계] 공고 수집")
+                collect_result = self.collector.collect(request_date=report_date)
+                results['collect_result'] = collect_result
+
+                if not collect_result.get('success'):
+                    results['success'] = False
+                    results['error'] = f"수집 실패: {collect_result.get('error')}"
+                    return results
+
+                report_file_path = collect_result.get('report_file_path')
+                collected_count = collect_result.get('collected_count', 0)
+
+                if collected_count == 0:
+                    self.logger.warning("수집된 공고가 없습니다.")
+                    return results
+            else:
+                self.logger.info("[1단계] 수집 건너뛰기 — 기존 리포트 파일로 재검수")
+                from services.file_service import REPORT_DIR, get_date_string
+                date_str = get_date_string(report_date)
+                report_file_path = str(REPORT_DIR / f'report_{date_str}.json')
+                if not __import__('pathlib').Path(report_file_path).exists():
+                    results['success'] = False
+                    results['error'] = f"리포트 파일 없음: {report_file_path}"
+                    return results
             
             # 2. 검수
             if not skip_review:
