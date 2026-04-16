@@ -149,10 +149,11 @@ def _process_single_announcement(
     title = announcement.get('title', '')
 
     # 이미 검수된 공고 건너뛰기 (단, API 오류로 실패한 경우 재검수)
-    if (announcement.get('reviewed') and announcement.get('review_result') and announcement.get('status')
-            and announcement.get('rejection_reason') != 'api_error'):
-        print(f"   [{idx}/{total}] 이미 검수됨: {announcement_number}")
-        return announcement.get('status', STATUS_REJECTED)
+    # [테스트 기간 비활성화] 재크롤링/재판별 허용을 위해 주석처리
+    # if (announcement.get('reviewed') and announcement.get('review_result') and announcement.get('status')
+    #         and announcement.get('rejection_reason') != 'api_error'):
+    #     print(f"   [{idx}/{total}] 이미 검수됨: {announcement_number}")
+    #     return announcement.get('status', STATUS_REJECTED)
 
     # ── 1단계: 제목 기반 빠른 분류 ──────────────────────────────
     title_class = classify_by_title(announcement)
