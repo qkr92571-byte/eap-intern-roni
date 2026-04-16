@@ -63,10 +63,11 @@ export const formatNumber = (num?: number): string => {
 export const getNaraJangteoUrl = (announcementNumber?: string): string | null => {
   if (!announcementNumber) return null;
   
-  // 공고번호 형식: "R25BK01187770-000" 또는 "R25BK01187770"
+  // 공고번호 형식: "R25BK01187770-000" 또는 "2026NIT001013039-01"
   const parts = announcementNumber.split('-');
   const bidPbancNo = parts[0]; // 하이픈 앞 부분
-  const bidPbancOrd = parts[1] || '000'; // 하이픈 뒤 부분, 없으면 기본값 '000'
+  const rawOrd = parts[1] || '000';
+  const bidPbancOrd = rawOrd.padStart(3, '0'); // 항상 3자리로 패딩 (예: '01' → '001')
   
   return `https://www.g2b.go.kr/link/PNPE027_01/single/?bidPbancNo=${bidPbancNo}&bidPbancOrd=${bidPbancOrd}`;
 };
