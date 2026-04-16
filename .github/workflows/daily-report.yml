@@ -22,7 +22,7 @@ on:
           - 'false'
           - 'true'
       skip_collect:
-        description: '수집 건너뛰기 — 기존 리포트 파일로 재검수할 때 사용'
+        description: '오늘 공고 재검수'
         required: false
         default: 'false'
         type: choice
