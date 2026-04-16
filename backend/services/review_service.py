@@ -402,15 +402,14 @@ def review_announcement_with_chatgpt(
         # EAP 검수 프롬프트 로드 (외부에서 전달된 경우 재사용, 없으면 Firestore에서 로드)
         if not base_prompt:
             base_prompt = load_eap_review_prompt()
-        prompt = base_prompt.format(
-            title=title,
-            agency=agency,
-            business_type=business_type,
-            publish_date=publish_date,
-            budget_info=budget_info if budget_info else "예산 정보 없음",
-            announcement_number=announcement.get('announcement_number', ''),
-            attachment_text=attachment_text if attachment_text else '첨부파일 없음 (제목·기관·예산 정보만으로 판단)',
-        )
+        prompt = base_prompt
+        prompt = prompt.replace('{title}', title)
+        prompt = prompt.replace('{agency}', agency)
+        prompt = prompt.replace('{business_type}', business_type)
+        prompt = prompt.replace('{publish_date}', publish_date)
+        prompt = prompt.replace('{budget_info}', budget_info if budget_info else "예산 정보 없음")
+        prompt = prompt.replace('{announcement_number}', announcement.get('announcement_number', ''))
+        prompt = prompt.replace('{attachment_text}', attachment_text if attachment_text else '첨부파일 없음 (제목·기관·예산 정보만으로 판단)')
 
         response = client.chat.completions.create(
             model=OPENAI_MODEL_REVIEW,
