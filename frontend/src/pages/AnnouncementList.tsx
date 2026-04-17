@@ -52,7 +52,8 @@ const AnnouncementList: React.FC = () => {
       const matchesReview = (() => {
         if (reviewFilter === 'all') return true;
         if (reviewFilter === 'approved') return announcement.status === 'approved';
-        if (reviewFilter === 'rejected') return announcement.status === 'rejected' || announcement.status === 'pending';
+        if (reviewFilter === 'rejected') return announcement.status === 'rejected';
+        if (reviewFilter === 'pending') return false;
         
         return true;
       })();
@@ -86,7 +87,7 @@ const AnnouncementList: React.FC = () => {
     return {
       all: announcements.length,
       approved: announcements.filter(a => a.status === 'approved').length,
-      rejected: announcements.filter(a => a.status === 'rejected' || a.status === 'pending').length,
+      rejected: announcements.filter(a => a.status === 'rejected').length,
     };
   }, [announcements]);
 

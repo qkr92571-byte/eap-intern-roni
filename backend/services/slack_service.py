@@ -139,7 +139,7 @@ def send_report_to_slack(
         total_count = len(announcements)
         # 상태 기준 집계 (키워드 필터로 누락되던 문제 수정)
         approved_count = sum(1 for a in announcements if a.get('status') == 'approved')
-        rejected_count = sum(1 for a in announcements if a.get('status') in ('rejected', 'pending'))
+        rejected_count = sum(1 for a in announcements if a.get('status') == 'rejected')
         pending_count = sum(1 for a in announcements if not a.get('reviewed', False))
         
         # 파일명에서 날짜 추출 (report_YYMMDD.json)

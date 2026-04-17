@@ -461,7 +461,7 @@ def review_announcement_with_chatgpt(
             rejection_reason = None
         elif decision == '불명확':
             # 불명확 → pending (수동 검토 대기)
-            approved = None
+            approved = False
             rejection_reason = 'gpt_uncertain'
         else:
             approved = False
