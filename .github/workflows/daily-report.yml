@@ -143,7 +143,7 @@ jobs:
           PLAYWRIGHT_TIMEOUT: "60000"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ github.event.inputs.slack_channel || 'C034EQD6W4W' }}
+          SLACK_CHANNEL_ID: ${{ github.event.inputs.slack_channel || 'C071ZL69JQZ' }}
           SLACK_EAP_USERGROUP: S08SE5ZTPQD
           FRONTEND_URL: https://eap-intern-roni.web.app
 
