@@ -64,11 +64,11 @@ class TestGptReviewApproval:
         assert result['approved'] is False
         assert result['rejection_reason'] == 'gpt_decision'
 
-    def test_불명확_pending_처리(self, mocker):
-        """'불명확' 결정이면 approved=None(pending)으로 처리 — 수동 검토 대기"""
+    def test_불명확_rejected_처리(self, mocker):
+        """'불명확' 결정이면 approved=False(부적합)으로 처리"""
         _make_mock_openai(mocker, "불명확", 80)
         result = review_announcement_with_chatgpt(SAMPLE_ANNOUNCEMENT)
-        assert result['approved'] is None
+        assert result['approved'] is False
         assert result['rejection_reason'] == 'gpt_uncertain'
 
 
