@@ -115,8 +115,8 @@ def skill_send_slack_report(
 
         # 채널 ID 기본값(자동 모드 또는 명시적 채널)
         if channel_id is None:
-            channel_id = os.getenv('SLACK_OFFICIAL_CHANNEL_ID', SLACK_PRODUCTION_CHANNEL_ID)
-        
+            channel_id = os.getenv("SLACK_CHANNEL_ID")
+
         # 채널이 명시된 경우에만 추가 컨펌(선택적으로 유지)
         if should_confirm(confirm_policy) and channel_id is not None:
             logger.warning("선택한 채널로 슬랙 메시지를 전송하시겠습니까?")
