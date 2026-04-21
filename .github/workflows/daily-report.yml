@@ -144,6 +144,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL_ID: ${{ github.event.inputs.slack_channel || secrets.SLACK_OFFICIAL_CHANNEL_ID }}
+          SLACK_OFFICIAL_CHANNEL_ID: ${{ secrets.SLACK_OFFICIAL_CHANNEL_ID }}
           SLACK_EAP_USERGROUP: S08SE5ZTPQD
           FRONTEND_URL: https://eap-intern-roni.web.app
 
